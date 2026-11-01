@@ -1,4 +1,4 @@
-# Reroll Module Build Environment
+# FlukeDrums Module Build Environment
 # Targets: Ableton Move (aarch64 Linux)
 
 # Pinned to amd64: the Debian aarch64 cross-toolchain packages are built for

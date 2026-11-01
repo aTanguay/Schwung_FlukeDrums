@@ -1,6 +1,6 @@
-# Reroll — Planning & Architecture
+# FlukeDrums — Planning & Architecture
 
-How Reroll works, why it's built this way, and the constraints any change has
+How FlukeDrums works, why it's built this way, and the constraints any change has
 to respect. For the task list see [TASKS.md](TASKS.md). For day-to-day
 conventions see [CLAUDE.md](CLAUDE.md).
 
@@ -22,17 +22,17 @@ Move and MrDrums already handle shaping sounds.
 - **Ableton Move**: aarch64 Linux groovebox, closed firmware.
 - **[Schwung](https://github.com/charlesvestal/schwung)**: unofficial framework
   that runs alongside Move's firmware and loads modules (`module.json` +
-  native `dsp.so` + optional JS UI). Reroll is a **sound generator** module in
+  native `dsp.so` + optional JS UI). FlukeDrums is a **sound generator** module in
   a Schwung shadow slot, played by a Move track via MIDI channel routing.
 - **[MrDrums](https://github.com/handcraftedcc/schwung-mrdrums)** (MIT): a
-  16-pad sample player. Reroll is a fork: MrDrums' engine, pad parameters and
+  16-pad sample player. FlukeDrums is a fork: MrDrums' engine, pad parameters and
   `.ablpreset` import, with the reroll layer added on top.
 
 ### Why fork MrDrums
 
 It already had what's needed underneath (16 pads on notes 36–51, per-pad
 parameters persisted as `p01_*`…`p16_*`, a WAV/AIFF decoder, Move kit import).
-Reroll adds one self-contained engine (`src/dsp/reroll.{h,cpp}`) plus glue in
+FlukeDrums adds one self-contained engine (`src/dsp/reroll.{h,cpp}`) plus glue in
 `mrdrums_plugin.cpp`. The diff stays reviewable, and the async-loading fixes can
 go back upstream (see TASKS.md, "Upstream").
 
@@ -106,8 +106,8 @@ Upstream MrDrums broke this in two places, both fixed here:
   **only if something landed**, so a no-op roll can't push the oldest entry off
   a full undo stack.
 - **Undo.** 32-deep stack of 16-path snapshots. Only pads that differ reload.
-- **Save Kit.** Creates `…/Samples/Schwung/Reroll/Reroll YYYY-MM-DD HHMMSS/`,
-  copies each pad as `NN <basename>`, and writes `reroll-kit.json` with sources.
+- **Save Kit.** Creates `…/Samples/Schwung/FlukeDrums/Fluke YYYY-MM-DD HHMMSS/`,
+  copies each pad as `NN <basename>`, and writes `flukedrums-kit.json` with sources.
 - **Folder scan.** Walks each library root (`My` → `UserLibrary/Samples`,
   `Core` → `CoreLibrary/Samples`), counts audio per folder recursively, and
   keeps folders with files down to depth 3. Over 128 entries (Schwung's enum

@@ -7,10 +7,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-IMAGE_NAME="reroll-builder-amd64"
+IMAGE_NAME="flukedrums-builder-amd64"
 
 if [ -z "$CROSS_PREFIX" ] && [ ! -f "/.dockerenv" ]; then
-    echo "=== Reroll Build (via Docker) ==="
+    echo "=== FlukeDrums Build (via Docker) ==="
     echo ""
 
     if ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
@@ -36,11 +36,11 @@ CROSS_PREFIX="${CROSS_PREFIX:-aarch64-linux-gnu-}"
 
 cd "$REPO_ROOT"
 
-echo "=== Building Reroll Module ==="
+echo "=== Building FlukeDrums Module ==="
 echo "Cross prefix: $CROSS_PREFIX"
 
-MODULE_DIR="dist/reroll"
-TARBALL="dist/reroll-module.tar.gz"
+MODULE_DIR="dist/flukedrums"
+TARBALL="dist/flukedrums-module.tar.gz"
 
 mkdir -p build
 rm -rf "$MODULE_DIR"

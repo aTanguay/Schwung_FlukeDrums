@@ -15,7 +15,7 @@ jobs:
         # TSan needs a smaller mmap randomization range on recent kernels.
         run: |
           sudo sysctl vm.mmap_rnd_bits=28
-          ./tests/run_reroll_tests.sh
+          ./tests/run_tests.sh
 
       - name: JSON files parse
         run: |
@@ -43,5 +43,5 @@ jobs:
       - run: ./scripts/build-zig.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: reroll-module
-          path: dist/reroll-module.tar.gz
+          name: flukedrums-module
+          path: dist/flukedrums-module.tar.gz

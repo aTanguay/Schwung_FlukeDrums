@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.0 — 2026-11-01
+
+### Changed
+- **Renamed from Reroll to FlukeDrums.** Module id is now `flukedrums`, so it
+  installs as a new module; remove the old "Reroll" module in Schwung Manager.
+- Saved kits now go to `Samples/Schwung/FlukeDrums/Fluke <date>/` with a
+  `flukedrums-kit.json` manifest (kits saved by Reroll stay where they were).
+- Release tarball is now `flukedrums-module.tar.gz`.
+
 ## 0.2.0 — 2026-10-31
 
 ### Added

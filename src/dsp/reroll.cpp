@@ -1,7 +1,7 @@
 /*
  * reroll.cpp — see reroll.h for the threading contract.
  *
- * MIT — part of the Reroll module (fork of MrDrums by handcraftedcc).
+ * MIT — the reroll engine of the FlukeDrums module (fork of MrDrums by handcraftedcc).
  */
 #include "reroll.h"
 
@@ -573,7 +573,7 @@ static void do_commit(rr_ctx *c) {
     time_t now = time(NULL);
     struct tm tmv;
     localtime_r(&now, &tmv);
-    strftime(stamp, sizeof(stamp), "Reroll %Y-%m-%d %H%M%S", &tmv);
+    strftime(stamp, sizeof(stamp), "Fluke %Y-%m-%d %H%M%S", &tmv);
 
     std::string dest = std::string(c->commit_root) + "/" + stamp;
     if (!mkdir_p(dest)) {
@@ -582,7 +582,7 @@ static void do_commit(rr_ctx *c) {
     }
 
     bool ok = true;
-    std::string manifest = "{\n  \"tool\": \"reroll\",\n  \"pads\": [";
+    std::string manifest = "{\n  \"tool\": \"flukedrums\",\n  \"pads\": [";
     bool first = true;
     for (int pad = 1; pad <= RR_PADS; pad++) {
         const std::string &src = c->cur[pad - 1];
@@ -602,7 +602,7 @@ static void do_commit(rr_ctx *c) {
     }
     manifest += "\n  ]\n}\n";
 
-    std::string mpath = dest + "/reroll-kit.json";
+    std::string mpath = dest + "/flukedrums-kit.json";
     FILE *mf = fopen(mpath.c_str(), "w");
     if (mf) {
         fwrite(manifest.data(), 1, manifest.size(), mf);

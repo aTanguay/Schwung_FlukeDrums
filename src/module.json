@@ -1,10 +1,10 @@
 {
- "id": "reroll",
- "name": "Reroll",
- "abbrev": "RRL",
- "version": "0.2.0",
- "description": "Random drum kits from a big sample pool: roll, lock the keepers, re-roll the rest, save the kit",
- "author": "Andy Tanguay (Reroll) / handcraftedcc (MrDrums engine)",
+ "id": "flukedrums",
+ "name": "FlukeDrums",
+ "abbrev": "FLUKE",
+ "version": "0.3.0",
+ "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit.",
+ "author": "Andy Tanguay (FlukeDrums) / handcraftedcc (MrDrums engine)",
  "license": "MIT",
  "dsp": "dsp.so",
  "api_version": 2,
@@ -33,7 +33,7 @@
   "ui_hierarchy": {
    "levels": {
     "root": {
-     "name": "Reroll",
+     "name": "FlukeDrums",
      "params": [
       "rr_roll",
       "rr_undo",

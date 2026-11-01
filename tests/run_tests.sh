@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Host-side tests for Reroll. Builds the real plugin sources natively and
+# Host-side tests for FlukeDrums. Builds the real plugin sources natively and
 # runs the workflow test twice: under ASan+UBSan (memory/leaks) and TSan (races).
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OUT="${TMPDIR:-/tmp}/reroll-tests"
+OUT="${TMPDIR:-/tmp}/flukedrums-tests"
 mkdir -p "$OUT"
 cd "$REPO_ROOT"
 
@@ -19,7 +19,7 @@ build() {  # name, extra flags
     local root="$OUT/fixture-$name"
     "$CXX" -std=c++14 -g -O1 -pthread -Isrc/dsp \
         -DTEST_ROOT="\"$root\"" \
-        -DREROLL_COMMIT_ROOT="\"$root/pool/Schwung/Reroll\"" \
+        -DREROLL_COMMIT_ROOT="\"$root/pool/Schwung/FlukeDrums\"" \
         -DREROLL_ROOT_MY="\"$root/pool\"" -DREROLL_ROOT_CORE="\"$root/longpool\"" \
         "$@" $SRCS -o "$OUT/reroll_test_$name" -lm
 }
@@ -43,4 +43,4 @@ ASAN_OPTIONS=detect_leaks=$LEAKS:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:p
 echo "== run: tsan"
 TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 "$OUT/reroll_test_tsan"
 
-echo "== all reroll tests passed"
+echo "== all FlukeDrums tests passed"

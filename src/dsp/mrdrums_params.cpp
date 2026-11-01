@@ -14,7 +14,7 @@ static const mrdrums_param_desc_t kGlobalParams[] = {
     {"ui_current_pad", "Current Pad", "int", NULL, 0, 1.0f, 16.0f, 1.0f, 1.0f, NULL, NULL, NULL, NULL, NULL},
     {"ui_pad_page", "Pad Page", "enum", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "main", "[\"main\",\"random\"]", NULL, NULL, NULL},
     {"ui_preset_path", "Load Preset", "filepath", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "", NULL, "/data", "[\".ablpreset\",\".json\"]", "/data/UserData/UserLibrary/Track Presets"},
-    /* Reroll: fallback for folders deeper than the Folder list. Pick ANY file
+    /* FlukeDrums: fallback for folders deeper than the Folder list. Pick ANY file
      * inside the folder you want; the folder is what's kept. */
     {"rr_pool_dir", "Browse", "filepath", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "/data/UserData/UserLibrary/Samples", NULL, "/data", "[\".wav\",\".aif\",\".aiff\"]", "/data/UserData/UserLibrary/Samples"},
     {"rr_recursive", "Subfolders", "enum", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "on", "[\"off\",\"on\"]", NULL, NULL, NULL},

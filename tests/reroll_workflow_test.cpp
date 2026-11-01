@@ -1,8 +1,8 @@
 /*
- * Host-side workflow test for Reroll: drives the real plugin API from one
+ * Host-side workflow test for FlukeDrums: drives the real plugin API from one
  * "audio" thread (this main thread) while the worker runs for real.
  *
- * Build (see tests/run_reroll_tests.sh):
+ * Build (see tests/run_tests.sh):
  *   g++ -std=c++14 -pthread -DREROLL_COMMIT_ROOT=... tests/reroll_workflow_test.cpp src/dsp/<all .cpp>
  */
 #include <cstdio>
@@ -159,7 +159,7 @@ int main() {
     const std::string root = TEST_ROOT;
     const std::string pool = root + "/pool";
     const std::string longpool = root + "/longpool";
-    const std::string commit_root = root + "/pool/Schwung/Reroll"; /* inside the pool on purpose */
+    const std::string commit_root = root + "/pool/Schwung/FlukeDrums"; /* inside the pool on purpose */
 
     std::system(("rm -rf '" + root + "'").c_str());
     mkdirs(pool + "/kicks"); mkdirs(pool + "/snares/deep"); mkdirs(pool + "/perc"); mkdirs(commit_root);
@@ -210,7 +210,7 @@ int main() {
     for (auto &p : roll1) {
         CHECK(starts_with(p, pool + "/"), "roll1 path outside pool: %s", p.c_str());
         CHECK(p.find("/stem") == std::string::npos, "roll1 picked a too-long stem: %s", p.c_str());
-        CHECK(p.find("/Schwung/Reroll/") == std::string::npos, "roll1 picked a committed file: %s", p.c_str());
+        CHECK(p.find("/Schwung/FlukeDrums/") == std::string::npos, "roll1 picked a committed file: %s", p.c_str());
         CHECK(p.find("/loop/") == std::string::npos, "roll1 followed the dir symlink: %s", p.c_str());
     }
     CHECK(get(inst, "rr_undo_depth") == "1", "undo depth after roll1: %s", get(inst, "rr_undo_depth").c_str());
@@ -270,13 +270,13 @@ int main() {
     settle(inst);
     std::string status = get(inst, "rr_status");
     std::string kit = get(inst, "rr_last_kit");
-    CHECK(starts_with(status, "Saved: Reroll "), "status after commit: %s", status.c_str());
-    CHECK(starts_with(kit, "Reroll "), "last kit name: %s", kit.c_str());
+    CHECK(starts_with(status, "Saved: Fluke "), "status after commit: %s", status.c_str());
+    CHECK(starts_with(kit, "Fluke "), "last kit name: %s", kit.c_str());
     std::string kitdir = commit_root + "/" + kit;
     CHECK(count_files(kitdir, ".wav") + count_files(kitdir, ".WAV") == 16, "kit folder has %d wavs",
           count_files(kitdir, ".wav") + count_files(kitdir, ".WAV"));
     struct stat st;
-    CHECK(stat((kitdir + "/reroll-kit.json").c_str(), &st) == 0 && st.st_size > 100, "manifest missing");
+    CHECK(stat((kitdir + "/flukedrums-kit.json").c_str(), &st) == 0 && st.st_size > 100, "manifest missing");
     set(inst, "rr_rescan", "Scan!");
     settle(inst);
     CHECK(get(inst, "rr_pool_count") == std::to_string(short_count + 3), "commit leaked into pool: %s",

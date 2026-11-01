@@ -1,8 +1,8 @@
 {
-  "title": "Reroll",
+  "title": "FlukeDrums",
   "children": [
     {
-      "title": "Reroll",
+      "title": "FlukeDrums",
       "children": [
         {
           "title": "The Idea",
@@ -47,7 +47,7 @@
             "  roll (32 deep)",
             "Save Kit: copy to",
             "  Samples/Schwung/",
-            "  Reroll/<date>",
+            "  FlukeDrums/<date>",
             "Rescan: reread pool",
             "Unlock All"
           ]

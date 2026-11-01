@@ -7,22 +7,22 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 
 cd "$REPO_ROOT"
 
-if [ ! -d "dist/reroll" ]; then
-    echo "Error: dist/reroll not found. Run ./scripts/build.sh first."
+if [ ! -d "dist/flukedrums" ]; then
+    echo "Error: dist/flukedrums not found. Run ./scripts/build.sh first."
     exit 1
 fi
 
-echo "=== Installing reroll Module ==="
+echo "=== Installing FlukeDrums Module ==="
 
 echo "Copying module to Move..."
-ssh ableton@move.local "mkdir -p /data/UserData/schwung/modules/sound_generators/reroll"
-scp -r dist/reroll/* ableton@move.local:/data/UserData/schwung/modules/sound_generators/reroll/
+ssh ableton@move.local "mkdir -p /data/UserData/schwung/modules/sound_generators/flukedrums"
+scp -r dist/flukedrums/* ableton@move.local:/data/UserData/schwung/modules/sound_generators/flukedrums/
 
 echo "Setting permissions..."
-ssh ableton@move.local "chmod -R a+rw /data/UserData/schwung/modules/sound_generators/reroll"
+ssh ableton@move.local "chmod -R a+rw /data/UserData/schwung/modules/sound_generators/flukedrums"
 
 echo ""
 echo "=== Install Complete ==="
-echo "Module installed to: /data/UserData/schwung/modules/sound_generators/reroll/"
+echo "Module installed to: /data/UserData/schwung/modules/sound_generators/flukedrums/"
 echo ""
 echo "Restart Schwung to load the new module."

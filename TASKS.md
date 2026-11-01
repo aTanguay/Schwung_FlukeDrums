@@ -50,8 +50,8 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 - [ ] Send the realtime fixes to MrDrums as a standalone PR: async sample
       loading + no allocation in `render_block`
 - [ ] Ask handcraftedcc whether they want the reroll layer in MrDrums, or
-      prefer Reroll as its own module
-- [ ] Submit Reroll to the Schwung module catalog (see
+      prefer FlukeDrums as its own module
+- [ ] Submit FlukeDrums to the Schwung module catalog (see
       [docs/RELEASING.md](docs/RELEASING.md))
 - [ ] Post on the Schwung Discord / Elektronauts thread with a short demo video
 
@@ -66,6 +66,7 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 
 ## Done
 
+- [x] v0.3.0: renamed **Reroll → FlukeDrums** (module id `flukedrums`)
 - [x] v0.2.0: **Folder picker** with counts (My / Core, 3 levels, 128 cap),
       **Up One**, Browse kept as fallback; coalesced pool changes when spinning
       the knob

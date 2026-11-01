@@ -13,7 +13,7 @@
  * Every rr_* call marked AUDIO-SAFE does no allocation, no I/O, no locking and
  * no syscalls. Safe to call from set_param / get_param / render_block.
  *
- * MIT — part of the Reroll module (fork of MrDrums by handcraftedcc).
+ * MIT — the reroll engine of the FlukeDrums module (fork of MrDrums by handcraftedcc).
  */
 #ifndef REROLL_H
 #define REROLL_H

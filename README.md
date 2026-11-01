@@ -1,8 +1,8 @@
-# Reroll 🎲
+# FlukeDrums 🎲
 
-**Random drum kits from your sample library, for Ableton Move.**
+**A drum machine built on lucky accidents, for Ableton Move.**
 
-Reroll is a [Schwung](https://schwung.dev) module that fills Move's 16 pads with
+FlukeDrums is a [Schwung](https://schwung.dev) module that fills Move's 16 pads with
 random samples pulled from a folder you choose. Like a pad? **Lock it.** Hit
 **Roll** again and only the unlocked pads change. Keep rolling, keep locking,
 and when the kit sparks something, **Save Kit** copies it into your Samples
@@ -14,7 +14,7 @@ It's a happy-accident machine. You don't build a kit, you find one.
  Roll  →  play  →  lock the keepers  →  Roll  →  …  →  Save Kit
 ```
 
-> **Status:** v0.2.0, early. It works on a real Move, but it's new.
+> **Status:** v0.3.0, early. It works on a real Move, but it's new.
 > Back up anything you care about before installing, and read Schwung's
 > [important notice](https://github.com/charlesvestal/schwung#important-notice)
 > (including DFU restore), as with any Schwung module.
@@ -43,7 +43,7 @@ It's a happy-accident machine. You don't build a kit, you find one.
 
 ## Install
 
-1. Download `reroll-module.tar.gz` from the
+1. Download `flukedrums-module.tar.gz` from the
    [latest release](../../releases/latest).
 2. On a computer on the same network, open **http://move.local:7700**
    (Schwung Manager).
@@ -54,14 +54,14 @@ To update, do the same thing with the newer file. Your settings and locks are ke
 
 ## Quick start
 
-1. Load **Reroll** into a Schwung slot, like any sound generator.
+1. Load **FlukeDrums** into a Schwung slot, like any sound generator.
 2. Point a Move track at it: hold **Shift**, press the **track button**, and
    set that track's MIDI out to the slot's channel.
 3. Pick a **Folder** (on the first page, or turn knob 8).
 4. Click **Roll** and play the pads.
 5. Like a pad? Hit it, then turn **knob 1 (Lock)** to `on`.
 6. **Roll** again. Repeat until it's good.
-7. **Save Kit**. It shows up in Move's browser under `Samples/Schwung/Reroll/`.
+7. **Save Kit**. It shows up in Move's browser under `Samples/Schwung/FlukeDrums/`.
 
 The [User Guide](docs/USER_GUIDE.md) covers every control, tips, and troubleshooting.
 
@@ -95,16 +95,16 @@ You need Python 3, nothing else. No Docker.
 
 ```bash
 pip install ziglang          # one-time: a cross-compiler for the Move's ARM chip
-./scripts/build-zig.sh       # → dist/reroll-module.tar.gz
+./scripts/build-zig.sh       # → dist/flukedrums-module.tar.gz
 ```
 
-Then upload `dist/reroll-module.tar.gz` as in [Install](#install), or run
+Then upload `dist/flukedrums-module.tar.gz` as in [Install](#install), or run
 `./scripts/install.sh` to copy it over SSH.
 
 To run the tests (macOS or Linux, needs a C++ compiler):
 
 ```bash
-./tests/run_reroll_tests.sh
+./tests/run_tests.sh
 ```
 
 Developer docs:
@@ -115,7 +115,7 @@ Developer docs:
 
 ## Credits
 
-- **Reroll** by Andy Tanguay.
+- **FlukeDrums** by Andy Tanguay.
 - Built on **[MrDrums](https://github.com/handcraftedcc/schwung-mrdrums)** by
   handcraftedcc (MIT). The sample engine, pad controls and `.ablpreset` loading are theirs.
 - Runs on **[Schwung](https://github.com/charlesvestal/schwung)** by Charles Vestal.
@@ -123,6 +123,12 @@ Developer docs:
   [PLANNING.md](PLANNING.md) for how.
 
 Not affiliated with or endorsed by Ableton.
+
+## About the name
+
+A *fluke* is a lucky accident, which is the whole idea. It's also a nod to
+W.S. "Fluke" Holland, Johnny Cash's drummer and one of rock and roll's first
+drummers.
 
 ## License
 

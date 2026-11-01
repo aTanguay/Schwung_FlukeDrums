@@ -1,4 +1,4 @@
-# Reroll User Guide
+# FlukeDrums User Guide
 
 - [The idea](#the-idea)
 - [Setup](#setup)
@@ -14,7 +14,7 @@
 
 ## The idea
 
-Reroll puts a random sample on each of Move's 16 pads. You play, keep what
+FlukeDrums puts a random sample on each of Move's 16 pads. You play, keep what
 works, and reroll the rest. Locked pads survive every roll, so a kit builds up
 one keeper at a time. Nothing is destructive: your samples are only read,
 **Undo Roll** walks back 32 rolls, and **Save Kit** copies files instead of
@@ -22,18 +22,18 @@ moving them.
 
 ## Setup
 
-1. **Install.** Upload `reroll-module.tar.gz` at **http://move.local:7700** →
+1. **Install.** Upload `flukedrums-module.tar.gz` at **http://move.local:7700** →
    **Install Custom Module**, then restart Schwung.
-2. **Load it.** Open Schwung, pick an empty slot, and choose **Reroll** from
+2. **Load it.** Open Schwung, pick an empty slot, and choose **FlukeDrums** from
    the sound generators.
 3. **Connect a Move track.** Hold **Shift** and press the track button you want
-   to play Reroll from, then set that track's **MIDI out** channel to match the
+   to play FlukeDrums from, then set that track's **MIDI out** channel to match the
    Schwung slot (slot A listens on channel 1 by default, B on 2, and so on).
-   Now Move's pads and sequencer play Reroll.
+   Now Move's pads and sequencer play FlukeDrums.
 
    Use an empty drum or audio track for this. Whatever instrument the Move track
    has will also play underneath.
-4. **Check Status** on Reroll's first page. After a moment it should say
+4. **Check Status** on FlukeDrums's first page. After a moment it should say
    something like `Ready 4210 smp 0 lock`: ready, 4210 samples in the pool,
    no pads locked.
 
@@ -41,7 +41,7 @@ Pads are silent until your first roll.
 
 ## Choosing where samples come from
 
-The **pool** is the folder Reroll draws from, plus everything below it.
+The **pool** is the folder FlukeDrums draws from, plus everything below it.
 
 ### Folder (the main way)
 
@@ -77,7 +77,7 @@ roll from your whole library. It stops at the top of My or Core.
 
 For a folder too deep for the list, use **Browse** on the Pool page. Schwung's
 browser can only pick *files*, so open the folder you want and **click any
-sample inside it**. Reroll uses that file's folder. **Folder** then shows it as
+sample inside it**. FlukeDrums uses that file's folder. **Folder** then shows it as
 `Custom: <name>`.
 
 ### Subfolders and Max Len
@@ -117,17 +117,17 @@ old sample.
 **Save Kit** copies the current 16 samples into a new folder:
 
 ```
-Samples/Schwung/Reroll/Reroll 2026-10-31 231045/
+Samples/Schwung/FlukeDrums/Fluke 2026-10-31 231045/
     01 Kick_Dusty.wav
     02 Snap_04.wav
     …
     16 Vox_Chop_12.wav
-    reroll-kit.json        ← which original file each pad came from
+    flukedrums-kit.json        ← which original file each pad came from
 ```
 
-Status shows `Saved: Reroll 2026-…`. The folder appears in Move's own sample
+Status shows `Saved: Fluke 2026-…`. The folder appears in Move's own sample
 browser, so you can build a native Move drum kit from it. Saved kits are never
-pulled back into Reroll's pool.
+pulled back into FlukeDrums's pool.
 
 Your Schwung set also remembers the kit, the locks, and the pool, so you don't
 have to Save Kit just to keep working tomorrow.
@@ -168,7 +168,7 @@ octave and every sample that lands there plays down an octave.
 none short enough). Pick another **Folder**, check **Subfolders** is on, or set
 **Max Len** to `0`.
 
-**Folder says `Scanning...`.** The folder list is built right after Reroll
+**Folder says `Scanning...`.** The folder list is built right after FlukeDrums
 loads, which takes a second or two on a big library. Back out of the page and
 come back in. If it persists, hit **Rescan**.
 
@@ -195,10 +195,10 @@ Attach it to an issue.
 
 | What | Where on the Move |
 |---|---|
-| The module | `/data/UserData/schwung/modules/sound_generators/reroll/` |
-| Saved kits | `/data/UserData/UserLibrary/Samples/Schwung/Reroll/` |
+| The module | `/data/UserData/schwung/modules/sound_generators/flukedrums/` |
+| Saved kits | `/data/UserData/UserLibrary/Samples/Schwung/FlukeDrums/` |
 | "My" in the folder list | `/data/UserData/UserLibrary/Samples` |
 | "Core" in the folder list | `/data/CoreLibrary/Samples` |
 
-Reroll only ever *writes* inside `Samples/Schwung/Reroll/`. Everything else is
+FlukeDrums only ever *writes* inside `Samples/Schwung/FlukeDrums/`. Everything else is
 read-only to it.

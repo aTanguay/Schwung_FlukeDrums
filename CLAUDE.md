@@ -1,10 +1,12 @@
 # CLAUDE.md
 
-Guidance for AI coding agents (and humans) working on Reroll. Read this before
+Guidance for AI coding agents (and humans) working on FlukeDrums. Read this before
 changing code. The *why* behind it is in [PLANNING.md](PLANNING.md); open work
 is in [TASKS.md](TASKS.md).
 
 ## What this is
+
+(Formerly "Reroll". The engine files keep the `reroll` name: rerolling is what they do.)
 
 A Schwung sound-generator module for Ableton Move: a fork of MrDrums that fills
 16 pads with random samples, with lock / reroll / undo / save. The C++ DSP
@@ -19,7 +21,7 @@ src/
   help.json              on-device help (lines ≤ 20 chars)
   dsp/
     reroll.h / .cpp      the reroll engine: worker thread, rings, scan, roll, undo, save, folder list
-    mrdrums_plugin.cpp   plugin API glue (MrDrums + Reroll params, async swap, UI contracts)
+    mrdrums_plugin.cpp   plugin API glue (MrDrums + FlukeDrums params, async swap, UI contracts)
     mrdrums_engine.*     MrDrums voice engine (mostly untouched)
     mrdrums_params.*     param tables (globals + per-pad fields)
 scripts/
@@ -28,7 +30,7 @@ scripts/
   install.sh             scp to move.local
   exports.map            only move_plugin_init_v2 is exported
 tests/
-  run_reroll_tests.sh    ★ runs everything under ASan/UBSan + TSan
+  run_tests.sh    ★ runs everything under ASan/UBSan + TSan
   reroll_engine_test.cpp engine only, fake loader
   reroll_workflow_test.cpp full plugin via the real API, generated WAVs
   upstream/              MrDrums' original tests (not run; see README there)
@@ -38,9 +40,9 @@ docs/                    USER_GUIDE.md, RELEASING.md, upstream-mrdrums/
 ## Commands
 
 ```bash
-./tests/run_reroll_tests.sh     # all tests, both sanitizers. Run before every commit.
+./tests/run_tests.sh     # all tests, both sanitizers. Run before every commit.
 pip install ziglang             # once
-./scripts/build-zig.sh          # → dist/reroll-module.tar.gz
+./scripts/build-zig.sh          # → dist/flukedrums-module.tar.gz
 ./scripts/install.sh            # copy to the Move over SSH (then restart Schwung)
 ```
 
@@ -102,7 +104,7 @@ for the sysroot): cross-compile the workflow test with
   `set_param` returns.
 - Both sanitizers must pass, and run TSan more than once if you touched
   threading.
-- Before a release, smoke-test the built `dist/reroll/dsp.so` (ARM64 under
+- Before a release, smoke-test the built `dist/flukedrums/dsp.so` (ARM64 under
   qemu, or on a Move).
 
 ## Style
@@ -115,5 +117,5 @@ for the sysroot): cross-compile the workflow test with
 ## Upstream relationship
 
 MrDrums is upstream (MIT, handcraftedcc). Keep `mrdrums_*` files close to
-upstream so fixes can flow both ways. Reroll-only logic belongs in
-`reroll.{h,cpp}` or clearly marked `/* ---- Reroll ---- */` blocks.
+upstream so fixes can flow both ways. FlukeDrums-only logic belongs in
+`reroll.{h,cpp}` or clearly marked `/* ---- FlukeDrums ---- */` blocks.

@@ -20,7 +20,7 @@
 /* Committed kits land here (inside UserLibrary/Samples so Move's own browser
  * sees them). The pool scan always skips this folder. */
 #ifndef REROLL_COMMIT_ROOT
-#define REROLL_COMMIT_ROOT "/data/UserData/UserLibrary/Samples/Schwung/Reroll"
+#define REROLL_COMMIT_ROOT "/data/UserData/UserLibrary/Samples/Schwung/FlukeDrums"
 #endif
 #define REROLL_MAX_RETIRED 64
 
@@ -101,7 +101,7 @@ typedef struct {
     char pad_sample_paths[MRDRUMS_ENGINE_PAD_COUNT][512];
     sample_buffer_t samples[MRDRUMS_ENGINE_PAD_COUNT];
 
-    /* ---- Reroll ---- */
+    /* ---- FlukeDrums ---- */
     rr_ctx_t *rr;                     /* NULL => synchronous MrDrums behaviour */
     int restoring;                    /* inside create_instance: record, don't enqueue */
     int pad_lock[MRDRUMS_ENGINE_PAD_COUNT];
@@ -1118,7 +1118,7 @@ static void clear_pad_sample(mrdrums_instance_t *inst, int pad_index) {
     mrdrums_engine_set_pad_sample(&inst->engine, pad_index, NULL, 0, MRDRUMS_ENGINE_SAMPLE_RATE);
 }
 
-/* ---- Reroll glue ------------------------------------------------------- */
+/* ---- FlukeDrums glue ---------------------------------------------------- */
 
 /* Worker-thread decoder: MrDrums' own WAV/AIFF loader (pure, reentrant). */
 static int rr_loader_adapter(const char *path, rr_buffer_t *out, char *err, int err_len) {
@@ -1456,7 +1456,7 @@ static int set_param_value(mrdrums_instance_t *inst, const char *key, const char
         return 1;
     }
 
-    /* ---- Reroll settings (persisted) ---- */
+    /* ---- FlukeDrums settings (persisted) ---- */
     if (strcmp(key, "rr_pool_dir") == 0) {
         char dir[512];
         rr_normalize_pool_dir(val, dir, sizeof(dir));
@@ -1483,13 +1483,13 @@ static int set_param_value(mrdrums_instance_t *inst, const char *key, const char
         return 1;
     }
 
-    /* ---- Reroll triggers (never persisted). Fire on the option name or
+    /* ---- FlukeDrums triggers (never persisted). Fire on the option name or
      * index 1; index 0 / "-" means "do nothing" so a stray write is harmless. */
     if (strncmp(key, "rr_", 3) == 0) {
         int fire = strcmp(val, "1") == 0 || (val[0] && val[0] != '-' && val[0] != '0');
         if (!fire) return 1;
         if (!inst->rr) {
-            set_error(inst, "Reroll worker not running");
+            set_error(inst, "FlukeDrums worker not running");
             return 1;
         }
         int cur = clampi(inst->ui_current_pad, 1, MRDRUMS_ENGINE_PAD_COUNT);
@@ -1631,7 +1631,7 @@ static int get_param_value(mrdrums_instance_t *inst, const char *key, char *buf,
     if (strcmp(key, "ui_last_sample_dir") == 0) return snprintf(buf, buf_len, "%s", inst->ui_last_sample_dir);
     if (strcmp(key, "ui_preset_path") == 0) return snprintf(buf, buf_len, "%s", inst->ui_preset_path);
 
-    /* ---- Reroll ---- */
+    /* ---- FlukeDrums ---- */
     if (strcmp(key, "rr_pool_dir") == 0) return snprintf(buf, buf_len, "%s", inst->rr_pool_dir);
     if (strcmp(key, "rr_recursive") == 0) return snprintf(buf, buf_len, "%s", on_off_to_string(inst->rr_recursive));
     if (strcmp(key, "rr_max_len") == 0) return snprintf(buf, buf_len, "%.4f", inst->rr_max_len);
@@ -1856,7 +1856,7 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
         }
     }
 
-    plugin_log(inst->rr ? "reroll instance created" : "reroll instance created (sync fallback)");
+    plugin_log(inst->rr ? "flukedrums instance created" : "flukedrums instance created (sync fallback)");
     return inst;
 }
 
@@ -1876,7 +1876,7 @@ static void v2_destroy_instance(void *instance) {
     }
 
     free(inst);
-    plugin_log("reroll instance destroyed");
+    plugin_log("flukedrums instance destroyed");
 }
 
 static void v2_on_midi(void *instance, const uint8_t *msg, int len, int source) {
@@ -2157,7 +2157,7 @@ static int build_chain_params_json(mrdrums_instance_t *inst, char *buf, int buf_
         }
     }
 
-    /* Reroll actions (access:write = a click fires it, never a knob scrub) and
+    /* FlukeDrums actions (access:write = a click fires it, never a knob scrub) and
      * readouts (access:read). */
     static const char *const kTriggers[][3] = {
         {"rr_roll", "Roll", "Roll!"},
@@ -2228,7 +2228,7 @@ static int build_ui_hierarchy(mrdrums_instance_t *inst, char *buf, int buf_len) 
         "{"
             "\"levels\":{"
                 "\"root\":{"
-                    "\"name\":\"Reroll\","
+                    "\"name\":\"FlukeDrums\","
                     "\"params\":["
                         "\"rr_roll\",\"rr_undo\",\"pad_lock\",\"rr_roll_pad\",\"rr_commit\","
                         "\"rr_folder\",\"rr_status\","
@@ -2265,7 +2265,7 @@ static int v2_get_param(void *instance, const char *key, char *buf, int buf_len)
     mrdrums_instance_t *inst = (mrdrums_instance_t *)instance;
     if (!inst || !key || !buf || buf_len <= 0) return -1;
 
-    if (strcmp(key, "name") == 0) return snprintf(buf, buf_len, "Reroll");
+    if (strcmp(key, "name") == 0) return snprintf(buf, buf_len, "FlukeDrums");
     if (strcmp(key, "state") == 0) return build_state_json(inst, buf, buf_len);
     if (strcmp(key, "chain_params") == 0) return build_chain_params_json(inst, buf, buf_len);
     if (strcmp(key, "ui_hierarchy") == 0) return build_ui_hierarchy(inst, buf, buf_len);

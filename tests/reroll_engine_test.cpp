@@ -133,7 +133,7 @@ int main() {
     const std::string root = TEST_ROOT;
     const std::string pool = root + "/pool";
     const std::string longpool = root + "/longpool";
-    const std::string commit_root = pool + "/Schwung/Reroll";
+    const std::string commit_root = pool + "/Schwung/FlukeDrums";
 
     if (std::system(("rm -rf '" + root + "'").c_str()) != 0) return 2;
     mkdirs(pool + "/kicks"); mkdirs(pool + "/snares/deep"); mkdirs(pool + "/perc");
@@ -241,14 +241,14 @@ int main() {
     settle(c);
     CHECK(rr_status(c) == RR_ST_COMMITTED, "commit status %s", rr_status_label(rr_status(c)));
     char name[256];
-    CHECK(rr_last_commit_name(c, name, sizeof(name)) > 0 && starts_with(name, "Reroll "), "commit name '%s'", name);
+    CHECK(rr_last_commit_name(c, name, sizeof(name)) > 0 && starts_with(name, "Fluke "), "commit name '%s'", name);
     std::string kit = commit_root + "/" + name;
     int filled = 0;
     for (auto &p : pads) filled += !p.path.empty();
     int copied = count_dir(kit, ".wav") + count_dir(kit, ".WAV") + count_dir(kit, ".aif");
     /* pad 8's path is the corrupt file: it's still a real file, so it is copied too */
     CHECK(copied == filled, "copied %d files, %d pads have paths", copied, filled);
-    CHECK(count_dir(kit, "reroll-kit.json") == 1, "manifest missing");
+    CHECK(count_dir(kit, "flukedrums-kit.json") == 1, "manifest missing");
     rr_set_pool(c, pool.c_str(), 1);
     settle(c);
     CHECK(rr_pool_count(c) == pool_total, "commit leaked into pool (%d)", rr_pool_count(c));
