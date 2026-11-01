@@ -1,0 +1,7 @@
+/* Only the plugin entry point is public. Everything else, including the
+ * statically linked C++ runtime, stays private to this dsp.so so it can't
+ * interpose on Move or on other Schwung modules in the same process. */
+{
+  global: move_plugin_init_v2;
+  local: *;
+};

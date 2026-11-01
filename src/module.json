@@ -1,0 +1,150 @@
+{
+ "id": "reroll",
+ "name": "Reroll",
+ "abbrev": "RRL",
+ "version": "0.2.0",
+ "description": "Random drum kits from a big sample pool: roll, lock the keepers, re-roll the rest, save the kit",
+ "author": "Andy Tanguay (Reroll) / handcraftedcc (MrDrums engine)",
+ "license": "MIT",
+ "dsp": "dsp.so",
+ "api_version": 2,
+ "defaults": {
+  "g_master_vol": 1.0,
+  "g_polyphony": 16,
+  "g_vel_curve": "linear",
+  "g_humanize_ms": 0.0,
+  "g_rand_seed": 1,
+  "g_rand_loop_steps": 16,
+  "ui_auto_select_pad": "on",
+  "ui_current_pad": 1,
+  "ui_pad_page": "main",
+  "rr_pool_dir": "/data/UserData/UserLibrary/Samples",
+  "rr_recursive": "on",
+  "rr_max_len": 2.0
+ },
+ "capabilities": {
+  "audio_out": true,
+  "audio_in": false,
+  "midi_in": true,
+  "midi_out": false,
+  "aftertouch": false,
+  "chainable": true,
+  "component_type": "sound_generator",
+  "ui_hierarchy": {
+   "levels": {
+    "root": {
+     "name": "Reroll",
+     "params": [
+      "rr_roll",
+      "rr_undo",
+      "pad_lock",
+      "rr_roll_pad",
+      "rr_commit",
+      "rr_folder",
+      "rr_status",
+      {
+       "label": "Pool",
+       "level": "pool"
+      },
+      {
+       "label": "Global",
+       "level": "global"
+      },
+      {
+       "label": "Pad Settings",
+       "level": "pad_settings"
+      },
+      "ui_preset_path"
+     ],
+     "knobs": [
+      "pad_lock",
+      "pad_vol",
+      "pad_pan",
+      "pad_tune",
+      "pad_start",
+      "pad_decay_ms",
+      "pad_choke_group",
+      "rr_folder"
+     ]
+    },
+    "pool": {
+     "name": "Pool",
+     "params": [
+      "rr_folder",
+      "rr_pool_up",
+      "rr_recursive",
+      "rr_max_len",
+      "rr_rescan",
+      "rr_pool_dir",
+      "rr_unlock_all",
+      "rr_pool_count",
+      "rr_undo_depth",
+      "rr_last_kit"
+     ],
+     "knobs": [
+      "rr_folder",
+      "rr_recursive",
+      "rr_max_len"
+     ]
+    },
+    "global": {
+     "name": "Global",
+     "params": [
+      "g_master_vol",
+      "g_polyphony",
+      "g_vel_curve",
+      "g_humanize_ms",
+      "g_rand_seed",
+      "g_rand_loop_steps"
+     ],
+     "knobs": [
+      "g_master_vol",
+      "g_polyphony",
+      "g_vel_curve",
+      "g_humanize_ms",
+      "g_rand_seed",
+      "g_rand_loop_steps"
+     ]
+    },
+    "pad_settings": {
+     "name": "Pad Settings",
+     "params": [
+      "ui_auto_select_pad",
+      "ui_current_pad",
+      "pad_lock",
+      "pad_sample_path",
+      "pad_vol",
+      "pad_pan",
+      "pad_tune",
+      "pad_start",
+      "pad_attack_ms",
+      "pad_decay_ms",
+      "pad_choke_group",
+      "pad_mode",
+      "pad_rand_pan_amt",
+      "pad_rand_vol_amt",
+      "pad_rand_decay_amt",
+      "pad_chance_pct"
+     ],
+     "knobs": [
+      "ui_auto_select_pad",
+      "ui_current_pad",
+      "ui_pad_page",
+      "pad_vol",
+      "pad_pan",
+      "pad_tune",
+      "pad_start",
+      "pad_attack_ms",
+      "pad_decay_ms",
+      "pad_choke_group",
+      "pad_mode",
+      "pad_rand_pan_amt",
+      "pad_rand_vol_amt",
+      "pad_rand_decay_amt",
+      "pad_chance_pct"
+     ]
+    }
+   }
+  }
+ }
+}

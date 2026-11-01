@@ -1,0 +1,47 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  sanitizers:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Engine + full-plugin tests under ASan/UBSan and TSan
+        # TSan needs a smaller mmap randomization range on recent kernels.
+        run: |
+          sudo sysctl vm.mmap_rnd_bits=28
+          ./tests/run_reroll_tests.sh
+
+      - name: JSON files parse
+        run: |
+          python3 -c "import json;json.load(open('src/module.json'));json.load(open('src/help.json'));json.load(open('release.json'))"
+
+      - name: help.json fits the 20-character display
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          bad = []
+          def walk(n):
+              for l in n.get("lines", []):
+                  if len(l) > 20: bad.append(l)
+              for c in n.get("children", []): walk(c)
+          walk(json.load(open("src/help.json")))
+          if bad:
+              print("Lines over 20 chars:", *bad, sep="\n  "); sys.exit(1)
+          EOF
+
+  arm64-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install ziglang
+      - run: ./scripts/build-zig.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reroll-module
+          path: dist/reroll-module.tar.gz

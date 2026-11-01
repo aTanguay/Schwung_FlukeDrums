@@ -1,0 +1,12 @@
+# build output
+build/
+dist/
+*.so
+*.o
+
+# editors / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+.worktrees/

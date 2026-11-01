@@ -1,0 +1,59 @@
+name: Release
+
+# Push a tag like v0.2.0 and this builds reroll-module.tar.gz and attaches it
+# to a GitHub Release. Schwung Manager installs straight from that release.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Zig (cross-compiler pinned to an old glibc)
+        run: pip install ziglang
+
+      - name: Check version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          mod="$(python3 -c "import json;print(json.load(open('src/module.json'))['version'])")"
+          rel="$(python3 -c "import json;print(json.load(open('release.json'))['version'])")"
+          echo "tag=$tag module.json=$mod release.json=$rel"
+          test "$tag" = "$mod" && test "$tag" = "$rel"
+
+      - name: Build module tarball
+        run: |
+          ./scripts/build-zig.sh
+          test -f dist/reroll-module.tar.gz
+
+      - name: Check the binary is safe for the Move
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq binutils-aarch64-linux-gnu
+          echo "glibc versions needed:"
+          aarch64-linux-gnu-objdump -T dist/reroll/dsp.so | grep -oE 'GLIBC_[0-9.]+' | sort -Vu
+          max="$(aarch64-linux-gnu-objdump -T dist/reroll/dsp.so | grep -oE 'GLIBC_[0-9.]+' | sed 's/GLIBC_//' | sort -V | tail -1)"
+          # MrDrums releases (built against glibc 2.35) run on the Move; stay well under.
+          python3 -c "import sys;v=tuple(map(int,'$max'.split('.')));sys.exit(0 if v<=(2,31) else 1)"
+          echo "exported symbols:"
+          aarch64-linux-gnu-nm -D --defined-only dist/reroll/dsp.so
+          test "$(aarch64-linux-gnu-nm -D --defined-only dist/reroll/dsp.so | wc -l)" -eq 1
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Reroll ${{ github.ref_name }}
+          generate_release_notes: true
+          files: dist/reroll-module.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
