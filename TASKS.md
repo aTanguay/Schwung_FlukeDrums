@@ -59,7 +59,6 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 
 - [ ] Port `tests/upstream/` MrDrums tests to the async loader (add a settle
       step) and run them in CI
-- [ ] Replace `YOUR_GITHUB_USER` in `release.json` once the repo exists
 - [ ] Rename `mrdrums_*` sources once upstreaming is settled (keeping names
       for now makes merging upstream fixes easy)
 

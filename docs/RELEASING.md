@@ -54,7 +54,7 @@ Either way works:
 - **Schwung Manager** (`http://move.local:7700`) → **Install Custom Module** →
   upload `flukedrums-module.tar.gz` from the release.
 - **Schwung Manager** → **Install Custom Module** → paste the repo URL
-  (`https://github.com/YOUR_GITHUB_USER/schwung-flukedrums`). Schwung reads
+  (`https://github.com/aTanguay/Schwung_FlukeDrums`). Schwung reads
   `release.json` to find the tarball.
 
 ## 4. Getting into the Schwung Module Store
@@ -72,7 +72,7 @@ in the Schwung repo. Open a pull request there that adds an entry like this:
   "component_type": "sound_generator",
   "subcategory": "drum-machine",
   "tags": ["sample-based", "drums", "generative"],
-  "github_repo": "YOUR_GITHUB_USER/schwung-flukedrums",
+  "github_repo": "aTanguay/Schwung_FlukeDrums",
   "default_branch": "main",
   "asset_name": "flukedrums-module.tar.gz",
   "min_host_version": "1.0.0"

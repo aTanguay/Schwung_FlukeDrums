@@ -33,7 +33,7 @@ jobs:
 
       - name: Build module tarball
         run: |
-          ./scripts/build-zig.sh
+          bash scripts/build-zig.sh
           test -f dist/flukedrums-module.tar.gz
 
       - name: Check the binary is safe for the Move

@@ -15,7 +15,7 @@ jobs:
         # TSan needs a smaller mmap randomization range on recent kernels.
         run: |
           sudo sysctl vm.mmap_rnd_bits=28
-          ./tests/run_tests.sh
+          bash tests/run_tests.sh
 
       - name: JSON files parse
         run: |
@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install ziglang
-      - run: ./scripts/build-zig.sh
+      - run: bash scripts/build-zig.sh
       - uses: actions/upload-artifact@v4
         with:
           name: flukedrums-module
