@@ -21,7 +21,7 @@ build() {  # name, extra flags
         -DTEST_ROOT="\"$root\"" \
         -DREROLL_COMMIT_ROOT="\"$root/pool/Schwung/FlukeDrums\"" \
         -DREROLL_ROOT_MY="\"$root/pool\"" -DREROLL_ROOT_CORE="\"$root/longpool\"" \
-        "$@" $SRCS -o "$OUT/reroll_test_$name" -lm
+        "$@" $SRCS -o "$OUT/flukedrums_test_$name" -lm
 }
 
 echo "== engine only (reroll.cpp, fake loader)"
@@ -39,8 +39,8 @@ build tsan -fsanitize=thread
 
 echo "== run: asan+ubsan"
 ASAN_OPTIONS=detect_leaks=$LEAKS:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
-    "$OUT/reroll_test_asan"
+    "$OUT/flukedrums_test_asan"
 echo "== run: tsan"
-TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 "$OUT/reroll_test_tsan"
+TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 "$OUT/flukedrums_test_tsan"
 
 echo "== all FlukeDrums tests passed"

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install reroll module to Move
+# Install FlukeDrums module to Move
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

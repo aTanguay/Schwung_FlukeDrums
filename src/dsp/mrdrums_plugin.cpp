@@ -65,7 +65,7 @@ static void plugin_log(const char *msg) {
     if (!msg) return;
     if (g_host && g_host->log) {
         char line[256];
-        snprintf(line, sizeof(line), "[mrdrums] %s", msg);
+        snprintf(line, sizeof(line), "[flukedrums] %s", msg);
         g_host->log(line);
     }
 }
@@ -2343,6 +2343,6 @@ extern "C" plugin_api_v2_t *move_plugin_init_v2(const host_api_v1_t *host) {
     g_api.get_error = v2_get_error;
     g_api.render_block = v2_render_block;
 
-    plugin_log("mrdrums plugin initialized");
+    plugin_log("flukedrums plugin initialized");
     return &g_api;
 }

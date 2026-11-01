@@ -26,7 +26,7 @@ Move and MrDrums already handle shaping sounds.
   a Schwung shadow slot, played by a Move track via MIDI channel routing.
 - **[MrDrums](https://github.com/handcraftedcc/schwung-mrdrums)** (MIT): a
   16-pad sample player. FlukeDrums is a fork: MrDrums' engine, pad parameters and
-  `.ablpreset` import, with the reroll layer added on top.
+  `.ablpreset` import, with the roll-and-lock layer added on top.
 
 ### Why fork MrDrums
 
