@@ -29,6 +29,7 @@ scripts/
   build.sh               Docker alternative inherited from MrDrums
   install.sh             scp to move.local
   exports.map            only move_plugin_init_v2 is exported
+  preview-pages.mjs      show the knob-grid pages using Schwung's own planner
 tests/
   run_tests.sh    ★ runs everything under ASan/UBSan + TSan
   reroll_engine_test.cpp engine only, fake loader
@@ -80,6 +81,14 @@ for the sysroot): cross-compile the workflow test with
     pulls in glibc 2.36/2.38 symbols. Use `build-zig.sh`, which pins 2.28.
 11. **Max Len applies to rolls only.** A hand-picked sample always loads.
 12. **Undo snapshots are pushed only when a roll actually changes a pad.**
+13. **Menu order is a workflow decision.** Page 1 (the root level's 8 knobs) is
+    the roll-and-lock loop, and Move's knobs are one physical row, so knobs
+    1→8 read as the steps: choose pool (1–3), Roll (4), work the kit (5–7),
+    Save Kit (8). On Schwung's grid every param in a level's
+    `params` that isn't on a knob spills onto an extra page, and a trigger
+    fires from a knob turn, so keep destructive triggers (Undo, Unlock All)
+    away from Roll. Check layout changes with `scripts/preview-pages.mjs`,
+    which runs Schwung's real planner.
 
 ## Adding a parameter
 

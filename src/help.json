@@ -21,53 +21,61 @@
     {
       "title": "Quick Start",
       "lines": [
-        "1 Folder: turn knob",
-        "  8, or click Folder",
-        "  for the full list.",
-        "2 Click Roll.",
-        "3 Like a pad? Hit",
-        "  it, turn knob 1",
-        "  (Lock) to on.",
-        "4 Roll again.",
-        "5 Undo Roll if you",
-        "  lost something.",
-        "6 Save Kit."
+        "Knobs go left to",
+        "right, in order:",
+        "1 Folder: pick the",
+        "  pool (click for",
+        "  the full list).",
+        "4 Roll: turn it.",
+        "5 Like the pad you",
+        "  just hit? Turn",
+        "  Lock clockwise.",
+        "Roll again. Undo",
+        "  is knob 7.",
+        "8 Save Kit."
       ]
     },
     {
       "title": "Actions",
       "lines": [
-        "Roll: all unlocked",
+        "Page 1, left to",
+        "right:",
+        "1 Folder 2 Up One",
+        "3 Max Len 4 Roll",
+        "5 Lock 6 Roll Pad",
+        "7 Undo 8 Save Kit",
+        "",
+        "Roll: unlocked pads",
         "Roll Pad: current",
-        "  pad only",
-        "Undo Roll: back one",
-        "  roll (32 deep)",
-        "Save Kit: copy to",
+        "Undo: back one roll",
+        "  (32 deep)",
+        "Save Kit: copies to",
         "  Samples/Schwung/",
-        "  FlukeDrums/<date>",
-        "Rescan: reread pool",
-        "Unlock All"
+        "  FlukeDrums/<date>"
       ]
     },
     {
       "title": "Pool Settings",
       "lines": [
+        "Page 1, knobs 1-3:",
+        "  Folder, Up One,",
+        "  Max Len.",
         "Folder: My = your",
         "  Samples, Core =",
         "  Ableton's library.",
         "  (N) = sample count",
-        "  incl. subfolders.",
         "Up One: widen pool",
         "  one folder level.",
+        "Pool page:",
+        "Subfolders: on/off",
+        "Rescan: after you",
+        "  add samples.",
         "Browse: any deeper",
         "  folder. Pick any",
         "  file inside it.",
-        "Subfolders: on/off",
+        "Unlock All",
         "Max Len: skip files",
-        "  longer than this",
-        "  (0 = no limit).",
-        "Rescan: after you",
-        "  add samples."
+        "  longer (0 = off)."
       ]
     },
     {
@@ -107,7 +115,7 @@
             {
               "title": "Sample",
               "lines": [
-                "Open Pad Settings,",
+                "Open the Pad page,",
                 "select Sample.",
                 "",
                 "Choose wav/aif",
@@ -147,7 +155,7 @@
           ]
         },
         {
-          "title": "Pad Settings",
+          "title": "Pad Page",
           "lines": [
             "Auto Select:",
             "switch pad from",

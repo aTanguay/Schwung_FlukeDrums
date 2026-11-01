@@ -14,7 +14,7 @@ It's a happy-accident machine. You don't build a kit, you find one.
  Roll  →  play  →  lock the keepers  →  Roll  →  …  →  Save Kit
 ```
 
-> **Status:** v0.3.0, early. It works on a real Move, but it's new.
+> **Status:** v0.4.0, early. It works on a real Move, but it's new.
 > Back up anything you care about before installing, and read Schwung's
 > [important notice](https://github.com/charlesvestal/schwung#important-notice)
 > (including DFU restore), as with any Schwung module.
@@ -57,37 +57,47 @@ To update, do the same thing with the newer file. Your settings and locks are ke
 1. Load **FlukeDrums** into a Schwung slot, like any sound generator.
 2. Point a Move track at it: hold **Shift**, press the **track button**, and
    set that track's MIDI out to the slot's channel.
-3. Pick a **Folder** (on the first page, or turn knob 8).
-4. Click **Roll** and play the pads.
-5. Like a pad? Hit it, then turn **knob 1 (Lock)** to `on`.
-6. **Roll** again. Repeat until it's good.
-7. **Save Kit**. It shows up in Move's browser under `Samples/Schwung/FlukeDrums/`.
+3. **Knob 1 (Folder)**: pick where samples come from.
+4. **Knob 4 (Roll)**: turn it, then play the pads.
+5. Like a pad? Hit it, then turn **knob 5 (Lock)** clockwise.
+6. **Roll** again. Repeat until it's good. **Knob 7** is Undo.
+7. **Knob 8 (Save Kit)**. The kit shows up in Move's browser under `Samples/Schwung/FlukeDrums/`.
+
+The first page's knobs read left to right as the steps, so a fresh session goes
+1 → 8 and you rarely need to leave that page.
 
 The [User Guide](docs/USER_GUIDE.md) covers every control, tips, and troubleshooting.
 
 ## Controls at a glance
 
-| First page | |
-|---|---|
-| **Roll** | new random samples on every unlocked pad |
-| **Undo Roll** | back to the kit before the last roll |
-| **Lock** | lock or unlock the current pad (also **knob 1**) |
-| **Roll Pad** | reroll just the current pad |
-| **Save Kit** | copy the kit into your Samples folder |
-| **Folder** | where samples come from (also **knob 8**) |
-| **Status** | e.g. `Ready 4210 smp 3 lock` |
+Jog moves between five pages, in the order you'll use them:
 
-| Pool page | |
-|---|---|
-| **Folder** | pick the pool from a list with sample counts |
-| **Up One** | widen the pool one folder level |
-| **Subfolders** | include subfolders (default on) |
-| **Max Len** | skip samples longer than this, in seconds (default 2, `0` = off) |
-| **Rescan** | re-read the library after adding samples |
-| **Browse** | pick a folder deeper than the list goes |
-| **Unlock All** | clear every lock |
+**1. Roll**: the whole loop, left to right
 
-**Global** and **Pad Settings** work the same as in MrDrums.
+| Knob | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---|---|---|---|---|---|---|---|
+| | Folder | Up One | Max Len | **Roll** | Lock | Roll Pad | Undo | Save Kit |
+| | *choose the pool* | | | *roll* | *work the kit* | | | *keep it* |
+
+On screen, knobs 1–4 are the top row and 5–8 the bottom row.
+
+- **Folder**: where samples come from, from a list with sample counts. **Up One**: widen the pool a level.
+- **Max Len**: skip samples longer than this many seconds (default 2, `0` = off).
+- **Roll**: new random samples on every unlocked pad.
+- **Lock**: clockwise locks the current pad, counter-clockwise unlocks it.
+- **Roll Pad**: reroll just the current pad. **Undo**: back to the kit before the last roll (32 deep).
+- **Save Kit**: copy the kit into your Samples folder.
+
+Roll, Undo and Save Kit fire from a single turn of their knob (one flick = one press), or a click.
+
+**2. Pad**: shape the pad you last hit. Vol, Pan, Tune, Start / Attack, Decay, Choke, Mode.
+
+**3. Pad 2**: the pad's Sample (pick by hand), plus Rand Pan, Rand Vol, Rand Decay and Chance.
+
+**4. Pool**: Subfolders, Rescan, Browse (deeper folders), Unlock All, and readouts:
+Pool Size, Undos, Status, Last Kit.
+
+**5. Global**: master volume, polyphony, velocity curve, humanize.
 
 ## Building from source
 

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.4.0 — 2026-11-01
+
+### Changed
+- **Menus in workflow order.** Page 1's knobs now read left to right as the
+  steps of a session:
+
+  | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 |
+  |---|---|---|---|---|---|---|---|
+  | Folder | Up One | Max Len | **Roll** | Lock | Roll Pad | Undo | Save Kit |
+
+  Then **Pad**, **Pad 2**, **Pool**, **Global**. Previously Roll was on the
+  second page behind the pad tone knobs.
+- Each control now appears once (the pad tone controls were on two pages).
+- Undo is kept three knobs from Roll, since a knob turn fires it on the grid;
+  Unlock All moved off page 1 to the Pool page.
+- Help screens: FlukeDrums pages first, the inherited sampler pages grouped
+  under **Sound Engine**; log lines say `[flukedrums]`.
+
+### Added
+- `scripts/preview-pages.mjs`: shows the knob-grid pages using Schwung's own
+  page planner, for checking layout changes.
+
+### Fixed
+- CI: the test runner lost its executable bit in the rename.
+
 ## 0.3.0 — 2026-11-01
 
 ### Changed

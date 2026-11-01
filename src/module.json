@@ -2,7 +2,7 @@
  "id": "flukedrums",
  "name": "FlukeDrums",
  "abbrev": "FLUKE",
- "version": "0.3.0",
+ "version": "0.4.0",
  "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit.",
  "author": "Andy Tanguay (FlukeDrums) / handcraftedcc (MrDrums engine)",
  "license": "MIT",
@@ -33,15 +33,20 @@
   "ui_hierarchy": {
    "levels": {
     "root": {
-     "name": "FlukeDrums",
+     "name": "Roll",
      "params": [
+      "rr_folder",
+      "rr_pool_up",
+      "rr_max_len",
       "rr_roll",
-      "rr_undo",
       "pad_lock",
       "rr_roll_pad",
+      "rr_undo",
       "rr_commit",
-      "rr_folder",
-      "rr_status",
+      {
+       "label": "Pad",
+       "level": "pad_settings"
+      },
       {
        "label": "Pool",
        "level": "pool"
@@ -50,21 +55,48 @@
        "label": "Global",
        "level": "global"
       },
-      {
-       "label": "Pad Settings",
-       "level": "pad_settings"
-      },
       "ui_preset_path"
      ],
      "knobs": [
+      "rr_folder",
+      "rr_pool_up",
+      "rr_max_len",
+      "rr_roll",
+      "pad_lock",
+      "rr_roll_pad",
+      "rr_undo",
+      "rr_commit"
+     ]
+    },
+    "pad_settings": {
+     "name": "Pad",
+     "params": [
+      "ui_auto_select_pad",
+      "ui_current_pad",
       "pad_lock",
       "pad_vol",
       "pad_pan",
       "pad_tune",
       "pad_start",
+      "pad_attack_ms",
       "pad_decay_ms",
       "pad_choke_group",
-      "rr_folder"
+      "pad_mode",
+      "pad_sample_path",
+      "pad_rand_pan_amt",
+      "pad_rand_vol_amt",
+      "pad_rand_decay_amt",
+      "pad_chance_pct"
+     ],
+     "knobs": [
+      "pad_vol",
+      "pad_pan",
+      "pad_tune",
+      "pad_start",
+      "pad_attack_ms",
+      "pad_decay_ms",
+      "pad_choke_group",
+      "pad_mode"
      ]
     },
     "pool": {
@@ -72,19 +104,25 @@
      "params": [
       "rr_folder",
       "rr_pool_up",
-      "rr_recursive",
       "rr_max_len",
+      "rr_recursive",
       "rr_rescan",
       "rr_pool_dir",
       "rr_unlock_all",
       "rr_pool_count",
       "rr_undo_depth",
+      "rr_status",
       "rr_last_kit"
      ],
      "knobs": [
-      "rr_folder",
       "rr_recursive",
-      "rr_max_len"
+      "rr_rescan",
+      "rr_pool_dir",
+      "rr_unlock_all",
+      "rr_pool_count",
+      "rr_undo_depth",
+      "rr_status",
+      "rr_last_kit"
      ]
     },
     "global": {
@@ -104,44 +142,6 @@
       "g_humanize_ms",
       "g_rand_seed",
       "g_rand_loop_steps"
-     ]
-    },
-    "pad_settings": {
-     "name": "Pad Settings",
-     "params": [
-      "ui_auto_select_pad",
-      "ui_current_pad",
-      "pad_lock",
-      "pad_sample_path",
-      "pad_vol",
-      "pad_pan",
-      "pad_tune",
-      "pad_start",
-      "pad_attack_ms",
-      "pad_decay_ms",
-      "pad_choke_group",
-      "pad_mode",
-      "pad_rand_pan_amt",
-      "pad_rand_vol_amt",
-      "pad_rand_decay_amt",
-      "pad_chance_pct"
-     ],
-     "knobs": [
-      "ui_auto_select_pad",
-      "ui_current_pad",
-      "ui_pad_page",
-      "pad_vol",
-      "pad_pan",
-      "pad_tune",
-      "pad_start",
-      "pad_attack_ms",
-      "pad_decay_ms",
-      "pad_choke_group",
-      "pad_mode",
-      "pad_rand_pan_amt",
-      "pad_rand_vol_amt",
-      "pad_rand_decay_amt",
-      "pad_chance_pct"
      ]
     }
    }

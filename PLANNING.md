@@ -169,4 +169,5 @@ correct-but-slow roll look like a bug.
 | 2026-10-31 | Build with Zig pinned to glibc 2.28 | Ubuntu 24.04 cross-gcc output needed glibc 2.38 |
 | 2026-10-31 | Export only the entry point | Statically linked runtime must not leak into the shared process |
 | 2026-10-31 | Folder picker as a dynamic enum, not Schwung's file browser | The browser can't select folders, and its knob-turn view shows one folder's files with no way up |
+| 2026-11-01 | Menus in workflow order: Roll page first, knobs left to right as the steps (pool → roll → work → save); then Pad, Pad 2, Pool, Global | Schwung's planner had put Roll on page 2 behind duplicate tone knobs; checked with Schwung's own planner |
 | 2026-10-31 | Library roots: My + Core | Covers user samples and Ableton's library; Up One stops at the root so the pool can't swallow system folders |
