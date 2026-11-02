@@ -3,7 +3,7 @@
 **A drum machine built on lucky accidents, for Schwung/Ableton Move.**
 
 FlukeDrums is a [Schwung](https://schwung.dev) module that fills Move's 16 pads with
-random samples pulled from a folder you choose...including subfolders. 
+random samples pulled from a folder you choose...including subfolders. Built from the excellent 'Mr Drums'
 
 Like a pad? **Lock it.** Hit **Roll** again and only the unlocked pads change. Keep rolling, keep locking,
 and when the kit sparks something, **Save Kit** copies it into your Samples
@@ -11,9 +11,6 @@ folder so Move's own browser can use it.
 
 It's a happy-accident machine. You don't build a kit, you find one.
 
-```
- Roll  →  play  →  lock the keepers  →  Roll  →  …  →  Save Kit
-```
 
 > **Status:** v0.4.1, early. It works on a real Move, but it's new.
 > Back up anything you care about before installing, and read Schwung's
@@ -55,7 +52,7 @@ To update, do the same thing with the newer file. Your settings and locks are ke
 
 ## Quick start
 
-1. Load **FlukeDrums** into a Schwung slot, like any sound generator.
+1. Load **FlukeDrums** into a Schwung slot, like any sound generator. 
 2. Point a Move track at it: hold **Shift**, press the **track button**, and
    set that track's MIDI out to the slot's channel.
 3. **Knob 1 (Folder)**: pick where samples come from.
@@ -101,23 +98,7 @@ Pool Size, Undos, Status, Last Kit.
 
 **5. Global**: master volume, polyphony, velocity curve, humanize.
 
-## Building from source
-
-You need Python 3, nothing else. No Docker.
-
-```bash
-pip install ziglang          # one-time: a cross-compiler for the Move's ARM chip
-./scripts/build-zig.sh       # → dist/flukedrums-module.tar.gz
-```
-
-Then upload `dist/flukedrums-module.tar.gz` as in [Install](#install), or run
-`./scripts/install.sh` to copy it over SSH.
-
-To run the tests (macOS or Linux, needs a C++ compiler):
-
-```bash
-./tests/run_tests.sh
-```
+## Misc
 
 Developer docs:
 - [PLANNING.md](PLANNING.md): how it works and why
