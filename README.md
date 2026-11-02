@@ -1,10 +1,11 @@
-# FlukeDrums 🎲
+# FlukeDrums 
 
-**A drum machine built on lucky accidents, for Ableton Move.**
+**A drum machine built on lucky accidents, for Schwung/Ableton Move.**
 
 FlukeDrums is a [Schwung](https://schwung.dev) module that fills Move's 16 pads with
-random samples pulled from a folder you choose. Like a pad? **Lock it.** Hit
-**Roll** again and only the unlocked pads change. Keep rolling, keep locking,
+random samples pulled from a folder you choose...including subfolders. 
+
+Like a pad? **Lock it.** Hit **Roll** again and only the unlocked pads change. Keep rolling, keep locking,
 and when the kit sparks something, **Save Kit** copies it into your Samples
 folder so Move's own browser can use it.
 
