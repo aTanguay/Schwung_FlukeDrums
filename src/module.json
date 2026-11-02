@@ -2,7 +2,7 @@
  "id": "flukedrums",
  "name": "FlukeDrums",
  "abbrev": "FLUKE",
- "version": "0.4.0",
+ "version": "0.4.1",
  "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit.",
  "author": "Andy Tanguay (FlukeDrums) / handcraftedcc (MrDrums engine)",
  "license": "MIT",

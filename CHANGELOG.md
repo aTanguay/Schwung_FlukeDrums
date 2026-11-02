@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.1 — 2026-11-02
 
 ### Changed
 - **Undo respects locks and your edits.** Undo now puts back only the pads

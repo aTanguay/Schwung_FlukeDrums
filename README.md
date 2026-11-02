@@ -14,7 +14,7 @@ It's a happy-accident machine. You don't build a kit, you find one.
  Roll  →  play  →  lock the keepers  →  Roll  →  …  →  Save Kit
 ```
 
-> **Status:** v0.4.0, early. It works on a real Move, but it's new.
+> **Status:** v0.4.1, early. It works on a real Move, but it's new.
 > Back up anything you care about before installing, and read Schwung's
 > [important notice](https://github.com/charlesvestal/schwung#important-notice)
 > (including DFU restore), as with any Schwung module.
