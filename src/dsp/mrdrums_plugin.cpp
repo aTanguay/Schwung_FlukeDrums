@@ -968,15 +968,33 @@ static std::string resolve_sample_uri(const std::string &uri, const char *preset
 static int set_pad_sample_path(mrdrums_instance_t *inst, int pad_index, const char *path);
 static int set_param_value(mrdrums_instance_t *inst, const char *key, const char *val);
 
-static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
-    if (!inst || !preset_path || !preset_path[0]) {
-        set_error(inst, "Preset path is empty");
-        return -1;
-    }
-    if (!has_preset_extension(preset_path)) {
-        set_error(inst, "Selected preset must be .ablpreset or .json");
-        return -1;
-    }
+/* ---- FlukeDrums: preset loading in two halves ----------------------------
+ * Reading and parsing an .ablpreset is file I/O plus allocation, so with the
+ * worker running it happens there (parse_preset_job), and the audio thread
+ * only applies the finished plan (apply_preset_plan, from render_block).
+ * Without a worker both halves run inline, as upstream did. */
+typedef struct {
+    int present;
+    char sample_path[512];
+    float vol, pan, tune, start, attack_ms, decay_ms;
+    int choke_group;
+} preset_plan_pad_t;
+
+typedef struct {
+    char error[256]; /* set => the preset is rejected and nothing is applied */
+    preset_plan_pad_t pads[MRDRUMS_ENGINE_PAD_COUNT];
+} preset_plan_t;
+
+static void *preset_plan_fail(preset_plan_t *plan, const char *msg) {
+    snprintf(plan->error, sizeof(plan->error), "%s", (msg && msg[0]) ? msg : "Could not load preset");
+    return plan;
+}
+
+/* Worker thread (or inline in the sync fallback). Touches no instance state.
+ * Returns one calloc'd plan (free() it), or NULL if out of memory. */
+static void *parse_preset_job(const char *preset_path) {
+    preset_plan_t *plan = (preset_plan_t *)calloc(1, sizeof(preset_plan_t));
+    if (!plan) return NULL;
 
     /* directory the preset lives in, for resolving any relative sample URIs */
     char preset_dir[1024];
@@ -985,10 +1003,7 @@ static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
     if (last_slash) *last_slash = '\0'; else preset_dir[0] = '.', preset_dir[1] = '\0';
 
     std::ifstream t(preset_path);
-    if (!t.is_open()) {
-        set_error(inst, "Could not open preset file");
-        return -1;
-    }
+    if (!t.is_open()) return preset_plan_fail(plan, "Could not open preset file");
     std::stringstream buffer;
     buffer << t.rdbuf();
     std::string json_str = buffer.str();
@@ -998,28 +1013,17 @@ static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
     std::string parse_err;
     preset_json_value_t root;
     if (preset_json_parse_value(json_str, &pos, &root, &parse_err) != 0) {
-        set_error(inst, parse_err.c_str());
-        return -1;
+        return preset_plan_fail(plan, parse_err.c_str());
     }
     preset_json_skip_ws(json_str, &pos);
-    if (pos != json_str.size()) {
-        set_error(inst, "Unexpected trailing JSON content");
-        return -1;
-    }
+    if (pos != json_str.size()) return preset_plan_fail(plan, "Unexpected trailing JSON content");
 
     const preset_json_value_t *drum_rack = preset_json_find_object_with_kind(&root, "drumRack");
-    if (!drum_rack) {
-        set_error(inst, "Preset does not contain a drumRack");
-        return -1;
-    }
+    if (!drum_rack) return preset_plan_fail(plan, "Preset does not contain a drumRack");
 
     const preset_json_value_t *chains = preset_json_object_get(drum_rack, "chains");
-    if (!chains || chains->type != PRESET_JSON_ARRAY) {
-        set_error(inst, "drumRack missing chains");
-        return -1;
-    }
+    if (!chains || chains->type != PRESET_JSON_ARRAY) return preset_plan_fail(plan, "drumRack missing chains");
 
-    std::string first_error;
     int mapped_cells = 0;
     for (size_t i = 0; i < chains->array_values.size(); i++) {
         const preset_json_value_t *chain = &chains->array_values[i];
@@ -1032,8 +1036,9 @@ static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
         }
 
         mapped_cells++;
-        int pad_index = note - 35;
-        int choke_group = preset_json_get_int_or_default(zone_settings, "chokeGroup", 0);
+        preset_plan_pad_t *pp = &plan->pads[note - 36];
+        pp->present = 1;
+        pp->choke_group = preset_json_get_int_or_default(zone_settings, "chokeGroup", 0);
 
         const preset_json_value_t *drum_cell = preset_json_find_object_with_kind(chain, "drumCell");
         const preset_json_value_t *device_data = preset_json_object_get(drum_cell, "deviceData");
@@ -1045,70 +1050,93 @@ static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
             sample_uri_str = preset_json_get_string(sample_uri);
         }
 
-        char resolved_wav_path[1024] = "";
+        pp->sample_path[0] = '\0';
         if (sample_uri_str && sample_uri_str[0]) {
             std::string resolved = resolve_sample_uri(sample_uri_str, preset_dir);
-            if (resolved.empty()) {
-                set_error(inst, "Unsupported ableton:/ sample URI");
-                return -1;
-            }
-            snprintf(resolved_wav_path, sizeof(resolved_wav_path), "%s", resolved.c_str());
+            if (resolved.empty()) return preset_plan_fail(plan, "Unsupported ableton:/ sample URI");
+            snprintf(pp->sample_path, sizeof(pp->sample_path), "%s", resolved.c_str());
         }
 
         float db = preset_json_get_number_or_default(parameters, "Volume", -12.0f);
-        float vol = clampf(powf(10.0f, (db + 12.0f) / 20.0f), 0.0f, 2.0f);
-        float pan = preset_json_get_number_or_default(parameters, "Pan", 0.0f);
-        float tune = preset_json_get_number_or_default(parameters, "Voice_Transpose", 0.0f);
-        float start = preset_json_get_number_or_default(parameters, "Voice_PlaybackStart", 0.0f);
-        float attack_ms = preset_json_get_number_or_default(parameters, "Voice_Envelope_Attack", 0.0f) * 1000.0f;
-        float decay_ms = preset_json_get_number_or_default(parameters, "Voice_Envelope_Decay", 0.25f) * 1000.0f;
-
-        if (set_pad_sample_path(inst, pad_index, resolved_wav_path) != 0 && first_error.empty()) {
-            first_error = inst->last_error[0] ? inst->last_error : "Failed to load preset sample";
-        }
-
-        char key[64];
-        char val_str[128];
-
-        mrdrums_make_pad_key(pad_index, "vol", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", vol);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "pan", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", pan);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "tune", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", tune);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "start", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", start);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "attack_ms", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", attack_ms);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "decay_ms", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%.6g", decay_ms);
-        set_param_value(inst, key, val_str);
-
-        mrdrums_make_pad_key(pad_index, "choke_group", key, sizeof(key));
-        snprintf(val_str, sizeof(val_str), "%d", choke_group);
-        set_param_value(inst, key, val_str);
+        pp->vol = clampf(powf(10.0f, (db + 12.0f) / 20.0f), 0.0f, 2.0f);
+        pp->pan = preset_json_get_number_or_default(parameters, "Pan", 0.0f);
+        pp->tune = preset_json_get_number_or_default(parameters, "Voice_Transpose", 0.0f);
+        pp->start = preset_json_get_number_or_default(parameters, "Voice_PlaybackStart", 0.0f);
+        pp->attack_ms = preset_json_get_number_or_default(parameters, "Voice_Envelope_Attack", 0.0f) * 1000.0f;
+        pp->decay_ms = preset_json_get_number_or_default(parameters, "Voice_Envelope_Decay", 0.25f) * 1000.0f;
     }
 
-    if (mapped_cells == 0) {
-        set_error(inst, "Preset contains no pads mapped to notes 36..51");
+    if (mapped_cells == 0) return preset_plan_fail(plan, "Preset contains no pads mapped to notes 36..51");
+    return plan;
+}
+
+static void preset_set_pad_value(mrdrums_instance_t *inst, int pad_index, const char *suffix, const char *fmt, double v) {
+    char key[64];
+    char val_str[128];
+    if (!mrdrums_make_pad_key(pad_index, suffix, key, sizeof(key))) return;
+    snprintf(val_str, sizeof(val_str), fmt, v);
+    set_param_value(inst, key, val_str);
+}
+
+/* Audio thread: no I/O, no allocation. Sample loads go async through
+ * set_pad_sample_path. */
+static int apply_preset_plan(mrdrums_instance_t *inst, const preset_plan_t *plan) {
+    if (!plan) {
+        set_error(inst, "Out of memory loading preset");
         return -1;
     }
-    if (!first_error.empty()) {
-        set_error(inst, first_error.c_str());
+    if (plan->error[0]) {
+        set_error(inst, plan->error);
+        return -1;
+    }
+
+    char first_error[256] = "";
+    for (int p = 1; p <= MRDRUMS_ENGINE_PAD_COUNT; p++) {
+        const preset_plan_pad_t *pp = &plan->pads[p - 1];
+        if (!pp->present) continue;
+
+        if (set_pad_sample_path(inst, p, pp->sample_path) != 0 && !first_error[0]) {
+            snprintf(first_error, sizeof(first_error), "%s",
+                     inst->last_error[0] ? inst->last_error : "Failed to load preset sample");
+        }
+        preset_set_pad_value(inst, p, "vol", "%.6g", pp->vol);
+        preset_set_pad_value(inst, p, "pan", "%.6g", pp->pan);
+        preset_set_pad_value(inst, p, "tune", "%.6g", pp->tune);
+        preset_set_pad_value(inst, p, "start", "%.6g", pp->start);
+        preset_set_pad_value(inst, p, "attack_ms", "%.6g", pp->attack_ms);
+        preset_set_pad_value(inst, p, "decay_ms", "%.6g", pp->decay_ms);
+        preset_set_pad_value(inst, p, "choke_group", "%.0f", (double)pp->choke_group);
+    }
+
+    if (first_error[0]) {
+        set_error(inst, first_error);
         return -1;
     }
     set_error(inst, NULL);
     return 0;
+}
+
+static int load_preset(mrdrums_instance_t *inst, const char *preset_path) {
+    if (!inst || !preset_path || !preset_path[0]) {
+        set_error(inst, "Preset path is empty");
+        return -1;
+    }
+    if (!has_preset_extension(preset_path)) {
+        set_error(inst, "Selected preset must be .ablpreset or .json");
+        return -1;
+    }
+    if (inst->rr) {
+        /* applied from render_block once the worker has parsed it */
+        if (rr_job(inst->rr, parse_preset_job, preset_path) != 0) {
+            set_error(inst, "Loader busy - try again");
+            return -1;
+        }
+        return 0;
+    }
+    preset_plan_t *plan = (preset_plan_t *)parse_preset_job(preset_path);
+    int r = apply_preset_plan(inst, plan);
+    free(plan);
+    return r;
 }
 
 static void clear_pad_sample(mrdrums_instance_t *inst, int pad_index) {
@@ -1157,6 +1185,15 @@ static void rr_collect_retired(mrdrums_instance_t *inst) {
 
 /* Audio thread: apply every decoded sample the worker has finished. */
 static void rr_apply_ready(mrdrums_instance_t *inst) {
+    /* Finished jobs first. The only job today is a preset parse. Its plan is
+     * freed on the worker; if that ring is full it waits in retired[], where
+     * buffer_in_use never matches it, so it's handed over on a later block. */
+    void *job;
+    while (inst->retired_count < REROLL_MAX_RETIRED && rr_poll_job(inst->rr, &job)) {
+        apply_preset_plan(inst, (const preset_plan_t *)job);
+        if (rr_free_later(inst->rr, job) != 0) inst->retired[inst->retired_count++] = (float *)job;
+    }
+
     rr_ready_t msg;
     while (inst->retired_count < REROLL_MAX_RETIRED && rr_poll(inst->rr, &msg)) {
         if (msg.pad < 1 || msg.pad > MRDRUMS_ENGINE_PAD_COUNT) {
@@ -1502,7 +1539,8 @@ static int set_param_value(mrdrums_instance_t *inst, const char *key, const char
             return 1;
         }
         if (strcmp(key, "rr_undo") == 0) {
-            rr_undo(inst->rr);
+            /* locked pads keep what they have, whatever the roll did */
+            rr_undo(inst->rr, ~rr_unlocked_mask(inst) & ((1u << MRDRUMS_ENGINE_PAD_COUNT) - 1u));
             return 1;
         }
         if (strcmp(key, "rr_commit") == 0) {
@@ -2157,8 +2195,8 @@ static int build_chain_params_json(mrdrums_instance_t *inst, char *buf, int buf_
         }
     }
 
-    /* FlukeDrums actions (access:write = a click fires it, never a knob scrub) and
-     * readouts (access:read). */
+    /* FlukeDrums actions (access:write; on the knob grid one turn fires them,
+     * so "-" at index 0 must stay a no-op) and readouts (access:read). */
     static const char *const kTriggers[][3] = {
         {"rr_roll", "Roll", "Roll!"},
         {"rr_roll_pad", "Roll Pad", "Roll!"},
@@ -2292,6 +2330,18 @@ static int v2_get_error(void *instance, char *buf, int buf_len) {
     return snprintf(buf, buf_len, "%s", inst->last_error);
 }
 
+/* ---- FlukeDrums: output soft clip. Clean up to 0.95, then a tanh knee that
+ * meets the clean signal with the same value and slope and approaches 1.0.
+ * Upstream applied tanhf(x) above 0.95 directly, which drops 0.951 to 0.74,
+ * so every loud peak folded into a notch (audible grit on hot kits). */
+static inline float soft_clip(float x) {
+    const float t = 0.95f;
+    const float k = 1.0f - t;
+    if (x > t) return t + k * tanhf((x - t) / k);
+    if (x < -t) return -t - k * tanhf((-x - t) / k);
+    return x;
+}
+
 static void v2_render_block(void *instance, int16_t *out_interleaved_lr, int frames) {
     mrdrums_instance_t *inst = (mrdrums_instance_t *)instance;
     if (!out_interleaved_lr || frames <= 0) return;
@@ -2320,11 +2370,8 @@ static void v2_render_block(void *instance, int16_t *out_interleaved_lr, int fra
         mrdrums_engine_render(&inst->engine, left, right, n);
 
         for (int i = 0; i < n; i++) {
-            float l = left[i];
-            float r = right[i];
-
-            if (l > 0.95f || l < -0.95f) l = tanhf(l);
-            if (r > 0.95f || r < -0.95f) r = tanhf(r);
+            float l = soft_clip(left[i]);
+            float r = soft_clip(right[i]);
 
             int32_t sl = (int32_t)(l * 32767.0f);
             int32_t sr = (int32_t)(r * 32767.0f);

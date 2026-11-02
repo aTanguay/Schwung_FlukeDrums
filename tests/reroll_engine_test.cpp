@@ -8,6 +8,8 @@
  */
 #include "reroll.h"
 
+#include <algorithm>
+#include <atomic>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -63,9 +65,20 @@ static Pad pads[RR_PADS];
 struct Held { float *p; int blocks_left; };
 static std::deque<Held> held;   /* retired but "a voice still plays it" */
 static long g_blocks = 0;
+static std::vector<std::string> g_jobs;   /* job results the "audio thread" received */
+static std::atomic<int> g_job_runs{0};
+
+/* Jobs run on the worker: return a malloc'd copy of the path, or nothing. */
+static void *echo_job(const char *path) { g_job_runs++; return strdup(path); }
+static void *null_job(const char *) { g_job_runs++; return nullptr; }
 
 static void audio_block(rr_ctx_t *c) {
     g_blocks++;
+    void *j;
+    while (rr_poll_job(c, &j)) {
+        g_jobs.push_back((const char *)j);
+        if (rr_free_later(c, j) != 0) std::free(j);
+    }
     rr_ready_t r;
     while (rr_poll(c, &r)) {
         CHECK(r.pad >= 1 && r.pad <= RR_PADS, "bad pad %d", r.pad);
@@ -170,7 +183,7 @@ int main() {
     settle(c);
 
     /* Undo with nothing to undo: harmless */
-    rr_undo(c);
+    rr_undo(c, 0);
     settle(c);
     for (auto &p : pads) CHECK(p.path.empty() && !p.data, "undo on empty stack loaded something");
 
@@ -200,11 +213,74 @@ int main() {
     for (int i = 0; i < 16; i++) if (i != 0 && i != 4 && r2[i] != r1[i]) changed++;
     CHECK(changed == 14, "changed %d of 14", changed);
 
-    /* Undo */
-    rr_undo(c);
+    /* Undo (pads 1 and 5 still locked: the roll didn't touch them anyway) */
+    rr_undo(c, (1u << 0) | (1u << 4));
     settle(c);
     CHECK(paths() == r1, "undo did not restore roll1");
     CHECK(rr_undo_depth(c) == 1, "undo depth after undo %d (roll1 is still undoable)", rr_undo_depth(c));
+
+    /* Undo skips pads that are locked now, and pads replaced since the roll */
+    {
+        rr_roll(c, 0xFFFF);
+        settle(c);
+        auto ra = paths();
+        std::vector<std::string> cands;
+        for (int i = 0; i < 14; i++) cands.push_back(pool + "/kicks/k" + std::to_string(i) + ".wav");
+        for (int i = 0; i < 12; i++) cands.push_back(pool + "/perc/p" + std::to_string(i) + ".aif");
+        std::string pick; /* a file in neither kit */
+        for (auto &cand : cands)
+            if (pick.empty() && std::find(ra.begin(), ra.end(), cand) == ra.end() &&
+                std::find(r1.begin(), r1.end(), cand) == r1.end()) pick = cand;
+        CHECK(!pick.empty(), "no spare file for the hand-pick");
+        rr_load(c, 3, pick.c_str(), 0);   /* replaced by hand after the roll */
+        settle(c);
+        CHECK(rr_undo_depth(c) == 2, "hand-pick added an undo step (%d)", rr_undo_depth(c));
+        rr_undo(c, 1u << 1);              /* pad 2 locked now */
+        settle(c);
+        auto ru = paths();
+        CHECK(ru[1] == ra[1], "undo reverted a locked pad");
+        CHECK(ru[2] == pick, "undo clobbered a pad replaced after the roll: %s", ru[2].c_str());
+        for (int i = 0; i < 16; i++)
+            if (i != 1 && i != 2) CHECK(ru[i] == r1[i], "undo didn't restore pad %d", i + 1);
+        CHECK(rr_undo_depth(c) == 1, "undo depth after partial undo %d", rr_undo_depth(c));
+
+        /* record_undo loads are their own step, and undo cleanly */
+        rr_load(c, 2, r1[1].c_str(), 0);
+        rr_load(c, 3, r1[2].c_str(), 1);
+        settle(c);
+        CHECK(paths() == r1 && rr_undo_depth(c) == 2, "recorded load: depth %d", rr_undo_depth(c));
+        rr_undo(c, 0);
+        settle(c);
+        CHECK(paths()[2] == pick, "undo of a recorded load: %s", paths()[2].c_str());
+        rr_load(c, 3, r1[2].c_str(), 0);
+        settle(c);
+        CHECK(paths() == r1 && rr_undo_depth(c) == 1, "couldn't put roll1 back (depth %d)", rr_undo_depth(c));
+    }
+
+    /* Generic jobs: run on the worker, the result comes back once, and the
+     * command stays busy until the audio side has taken the result. */
+    {
+        g_jobs.clear();
+        g_job_runs = 0;
+        rr_job(c, echo_job, "only");
+        for (int i = 0; i < 20000 && g_job_runs.load() == 0; i++) usleep(100);
+        usleep(200 * 1000);
+        CHECK(rr_busy(c), "busy dropped before the job result was polled");
+        settle(c);
+        CHECK(g_jobs.size() == 1 && g_jobs[0] == "only", "job result (%zu)", g_jobs.size());
+
+        g_jobs.clear();
+        for (int i = 0; i < 6; i++) rr_job(c, echo_job, ("step" + std::to_string(i)).c_str());
+        settle(c);
+        CHECK(!g_jobs.empty() && g_jobs.back() == "step5", "last queued job must win");
+        CHECK(g_jobs.size() <= 6, "too many job results %zu", g_jobs.size());
+
+        g_jobs.clear();
+        rr_job(c, null_job, "nothing");   /* NULL result: no hang, nothing delivered */
+        settle(c);
+        CHECK(g_jobs.empty(), "NULL job delivered something");
+        CHECK(rr_job(c, nullptr, "x") == -1, "null job fn accepted");
+    }
 
     /* Single pad */
     rr_roll(c, 1u << 2);
@@ -352,6 +428,7 @@ int main() {
     /* Shutdown with work in flight: nothing may leak (LSan) or hang */
     rr_set_pool(c, pool.c_str(), 1);
     for (int k = 0; k < 20; k++) rr_roll(c, 0xFFFF);
+    rr_job(c, echo_job, "late");   /* result never polled: destroy frees it */
     audio_block(c);
     rr_destroy(c);
     for (auto &h : held) std::free(h.p);

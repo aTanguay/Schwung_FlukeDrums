@@ -85,7 +85,8 @@ On screen, knobs 1–4 are the top row and 5–8 the bottom row.
 - **Max Len**: skip samples longer than this many seconds (default 2, `0` = off).
 - **Roll**: new random samples on every unlocked pad.
 - **Lock**: clockwise locks the current pad, counter-clockwise unlocks it.
-- **Roll Pad**: reroll just the current pad. **Undo**: back to the kit before the last roll (32 deep).
+- **Roll Pad**: reroll just the current pad. **Undo**: put back what the last roll changed (32 deep).
+  Pads you've locked or swapped by hand since stay put.
 - **Save Kit**: copy the kit into your Samples folder.
 
 Roll, Undo and Save Kit fire from a single turn of their knob (one flick = one press), or a click.

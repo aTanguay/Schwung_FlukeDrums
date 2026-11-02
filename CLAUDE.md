@@ -58,7 +58,8 @@ for the sysroot): cross-compile the workflow test with
    `on_midi`, `render_block`, `create_instance` and `destroy_instance` all run on
    Schwung's realtime callback. No file I/O, no `malloc`/`free`/`new`, no
    `std::string`/`std::vector` growth, no locks, no logging. Anything that
-   touches disk or allocates goes through `reroll.cpp`'s worker as a command.
+   touches disk or allocates goes through `reroll.cpp`'s worker as a command
+   (sample decodes via `rr_load`, anything else via `rr_job`).
    (`create_instance` may call `rr_create`, which allocates and spawns the
    worker once. That's accepted, as in other catalog modules.)
 2. **`get_param` must be cheap.** It runs on every UI repaint. Format cached
@@ -81,6 +82,9 @@ for the sysroot): cross-compile the workflow test with
     pulls in glibc 2.36/2.38 symbols. Use `build-zig.sh`, which pins 2.28.
 11. **Max Len applies to rolls only.** A hand-picked sample always loads.
 12. **Undo snapshots are pushed only when a roll actually changes a pad.**
+    Undo reverts only pads the step changed that aren't locked and still hold
+    the step's result; hand-picks are not undo steps, so undo must never
+    clobber them.
 13. **Menu order is a workflow decision.** Page 1 (the root level's 8 knobs) is
     the roll-and-lock loop, and Move's knobs are one physical row, so knobs
     1→8 read as the steps: choose pool (1–3), Roll (4), work the kit (5–7),

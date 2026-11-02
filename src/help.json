@@ -48,7 +48,8 @@
         "Roll: unlocked pads",
         "Roll Pad: current",
         "Undo: back one roll",
-        "  (32 deep)",
+        "  (32 deep; locked",
+        "  pads stay put)",
         "Save Kit: copies to",
         "  Samples/Schwung/",
         "  FlukeDrums/<date>"

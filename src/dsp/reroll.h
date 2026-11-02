@@ -9,6 +9,8 @@
  *   commands  audio  -> worker   roll / load / undo / commit / settings
  *   ready     worker -> audio    a decoded sample for a pad (ownership moves)
  *   retired   audio  -> worker   a buffer no voice references any more
+ *                                (or a used job result), to free()
+ *   jobs_done worker -> audio    a finished file job (e.g. a parsed preset)
  *
  * Every rr_* call marked AUDIO-SAFE does no allocation, no I/O, no locking and
  * no syscalls. Safe to call from set_param / get_param / render_block.
@@ -60,6 +62,10 @@ typedef struct {
  * Must be reentrant. Returns 0 on success and fills *out (heap data). */
 typedef int (*rr_loader_fn)(const char *path, rr_buffer_t *out, char *err, int err_len);
 
+/* Generic file job (e.g. parsing a preset). Runs on the worker thread only.
+ * Returns ONE malloc'd, free()-able block (no destructors), or NULL. */
+typedef void *(*rr_job_fn)(const char *path);
+
 /* A decoded sample ready to swap in. pad is 1-based. buf.data == NULL means
  * "clear this pad". After rr_poll() returns it, the caller owns buf.data. */
 typedef struct {
@@ -99,16 +105,26 @@ RR_API int rr_set_pool(rr_ctx_t *ctx, const char *dir, int recursive);  /* (re)s
 RR_API int rr_set_max_len(rr_ctx_t *ctx, float seconds);                /* <=0: no limit */
 RR_API int rr_roll(rr_ctx_t *ctx, uint32_t pad_mask);                   /* bit 0 = pad 1 */
 RR_API int rr_load(rr_ctx_t *ctx, int pad, const char *path, int record_undo); /* "" clears */
-RR_API int rr_undo(rr_ctx_t *ctx);
+/* Undo the last roll, but only on pads that roll changed, that aren't in
+ * locked_mask, and that still hold what the roll put there (a pad you've
+ * since replaced by hand keeps your pick). The step is consumed either way. */
+RR_API int rr_undo(rr_ctx_t *ctx, uint32_t locked_mask);
 RR_API int rr_commit(rr_ctx_t *ctx);
 /* Folder picker: register library roots ("My" -> UserLibrary/Samples, ...),
  * then (re)build the list. Roots that don't exist are skipped. */
 RR_API int rr_add_folder_root(rr_ctx_t *ctx, const char *dir, const char *label);
 RR_API int rr_scan_folders(rr_ctx_t *ctx);
+/* Run fn(path) on the worker. If another job with the same fn is queued
+ * behind this one, this one is skipped (browser preview fires one per step). */
+RR_API int rr_job(rr_ctx_t *ctx, rr_job_fn fn, const char *path);
 
 /* ---- AUDIO-SAFE: results. */
 RR_API int rr_poll(rr_ctx_t *ctx, rr_ready_t *out);        /* 1 = got one, 0 = empty */
 RR_API int rr_retire(rr_ctx_t *ctx, float *data);          /* 0 ok, -1 full (try again later) */
+/* A finished job's result; the caller owns it and must hand it back with
+ * rr_free_later() (it counts as busy until polled). 1 = got one, 0 = empty. */
+RR_API int rr_poll_job(rr_ctx_t *ctx, void **out);
+RR_API int rr_free_later(rr_ctx_t *ctx, void *p);          /* 0 ok, -1 full (try again later) */
 
 /* ---- AUDIO-SAFE: readouts. */
 RR_API rr_status_t rr_status(const rr_ctx_t *ctx);

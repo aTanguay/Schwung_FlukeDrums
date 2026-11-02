@@ -73,7 +73,8 @@ enum CmdType {
     CMD_UNDO,
     CMD_COMMIT,
     CMD_FOLDER_ROOT,
-    CMD_SCAN_FOLDERS
+    CMD_SCAN_FOLDERS,
+    CMD_JOB
 };
 
 struct Cmd {
@@ -82,6 +83,7 @@ struct Cmd {
     uint32_t mask;
     int flag;
     float f;
+    rr_job_fn job;
     char path[RR_PATH_MAX];
     char label[32];
 };
@@ -93,6 +95,13 @@ struct FolderRoot {
 
 typedef std::array<std::string, RR_PADS> Snapshot;
 
+/* One undoable change. Keeping "after" lets undo tell which pads the change
+ * actually touched, and whether you've replaced them since. */
+struct UndoStep {
+    Snapshot before;
+    Snapshot after;
+};
+
 struct rr_ctx {
     rr_loader_fn loader = nullptr;
     char commit_root[RR_PATH_MAX] = {0};
@@ -103,7 +112,8 @@ struct rr_ctx {
 
     Spsc<Cmd, 64> cmds;
     Spsc<rr_ready_t, 48> ready;
-    Spsc<float *, 256> retired;
+    Spsc<void *, 256> retired;     /* sample buffers and job results, freed on the worker */
+    Spsc<void *, 8> jobs_done;     /* job results, worker -> audio */
 
     std::atomic<int> status{RR_ST_NO_POOL};
     std::atomic<int> pool_count{0};
@@ -128,7 +138,7 @@ struct rr_ctx {
     bool recursive = true;
     float max_len = 2.0f;
     Snapshot cur;
-    std::vector<Snapshot> undo;
+    std::vector<UndoStep> undo;
     uint64_t rng = 0x9E3779B97F4A7C15ull;
 };
 
@@ -252,7 +262,7 @@ static void push_ready(rr_ctx *c, int pad, rr_buffer_t buf, const std::string &p
             free(buf.data);
             return;
         }
-        float *p;
+        void *p;
         while (c->retired.pop(p)) free(p);
         sleep_ms(2);
     }
@@ -477,13 +487,12 @@ static bool load_one(rr_ctx *c, const std::string &path, bool enforce_len, rr_bu
     return true;
 }
 
-static void push_undo_snapshot(rr_ctx *c, const Snapshot &snap) {
-    c->undo.push_back(snap);
+/* Record a change: `before` is the kit before it, c->cur the kit after. */
+static void push_undo_step(rr_ctx *c, const Snapshot &before) {
+    c->undo.push_back(UndoStep{before, c->cur});
     if ((int)c->undo.size() > RR_UNDO_DEPTH) c->undo.erase(c->undo.begin());
     c->undo_depth.store((int)c->undo.size());
 }
-
-static void push_undo(rr_ctx *c) { push_undo_snapshot(c, c->cur); }
 
 static void do_roll(rr_ctx *c, uint32_t mask) {
     mask &= (1u << RR_PADS) - 1u;
@@ -529,14 +538,15 @@ static void do_roll(rr_ctx *c, uint32_t mask) {
         }
     }
 
-    if (changed) push_undo_snapshot(c, before);
+    if (changed) push_undo_step(c, before);
     c->status.store(RR_ST_IDLE);
 }
 
 static void do_load(rr_ctx *c, int pad, const std::string &path, bool record_undo) {
     if (pad < 1 || pad > RR_PADS) return;
-    if (record_undo) push_undo(c);
+    const Snapshot before = c->cur;
     c->cur[pad - 1] = path;
+    if (record_undo && before[pad - 1] != path) push_undo_step(c, before);
     rr_buffer_t buf;
     memset(&buf, 0, sizeof(buf));
     if (!path.empty()) {
@@ -547,17 +557,41 @@ static void do_load(rr_ctx *c, int pad, const std::string &path, bool record_und
     push_ready(c, pad, buf, path);
 }
 
-static void do_undo(rr_ctx *c) {
+/* Revert the last step on the pads it changed, except pads that are locked
+ * now or that you've replaced since (they no longer hold step.after). The
+ * step is consumed even if every pad is skipped, so Undo can't get stuck. */
+static void do_undo(rr_ctx *c, uint32_t locked) {
     if (c->undo.empty()) return;
     c->status.store(RR_ST_ROLLING);
-    Snapshot snap = c->undo.back();
+    const UndoStep step = c->undo.back();
     c->undo.pop_back();
     c->undo_depth.store((int)c->undo.size());
     for (int pad = 1; pad <= RR_PADS; pad++) {
-        if (snap[pad - 1] == c->cur[pad - 1]) continue;
-        do_load(c, pad, snap[pad - 1], false);
+        const int i = pad - 1;
+        if (locked & (1u << i)) continue;
+        if (step.before[i] == step.after[i]) continue;   /* the step didn't touch it */
+        if (c->cur[i] != step.after[i]) continue;        /* changed since: keep it */
+        do_load(c, pad, step.before[i], false);
     }
     c->status.store(RR_ST_IDLE);
+}
+
+/* Returns true if the result went to the audio thread, which then settles
+ * `pending` when it polls it (so busy stays up until the result is applied). */
+static bool do_job(rr_ctx *c, const Cmd &cmd) {
+    if (!cmd.job) return false;
+    void *result = cmd.job(cmd.path);
+    if (!result) return false;
+    while (!c->jobs_done.push(result)) {
+        if (c->stop.load(std::memory_order_relaxed)) {
+            free(result);
+            return false;
+        }
+        void *p;
+        while (c->retired.pop(p)) free(p);
+        sleep_ms(2);
+    }
+    return true;
 }
 
 static void do_commit(rr_ctx *c) {
@@ -640,7 +674,8 @@ static void demote_self(void) {
 #endif
 }
 
-static void handle(rr_ctx *c, const Cmd &cmd) {
+/* Returns true if the command's pending count is now owned by the audio thread. */
+static bool handle(rr_ctx *c, const Cmd &cmd) {
     switch (cmd.type) {
     case CMD_SET_POOL:
         /* Spinning the Folder knob queues a pool change per detent: only
@@ -668,7 +703,7 @@ static void handle(rr_ctx *c, const Cmd &cmd) {
         break;
     }
     case CMD_UNDO:
-        do_undo(c);
+        do_undo(c, cmd.mask);
         break;
     case CMD_COMMIT:
         do_commit(c);
@@ -687,9 +722,15 @@ static void handle(rr_ctx *c, const Cmd &cmd) {
         if (c->cmds.any_queued([](const Cmd &q) { return q.type == CMD_SCAN_FOLDERS; })) break;
         do_scan_folders(c);
         break;
+    case CMD_JOB: {
+        const rr_job_fn fn = cmd.job;
+        if (c->cmds.any_queued([fn](const Cmd &q) { return q.type == CMD_JOB && q.job == fn; })) break;
+        return do_job(c, cmd);
+    }
     default:
         break;
     }
+    return false;
 }
 
 static void *worker_main(void *arg) {
@@ -703,15 +744,14 @@ static void *worker_main(void *arg) {
 
     while (!c->stop.load(std::memory_order_acquire)) {
         bool did = false;
-        float *p;
+        void *p;
         while (c->retired.pop(p)) {
             free(p);
             did = true;
         }
         Cmd cmd;
         if (c->cmds.pop(cmd)) {
-            handle(c, cmd);
-            c->pending.fetch_sub(1, std::memory_order_acq_rel);
+            if (!handle(c, cmd)) c->pending.fetch_sub(1, std::memory_order_acq_rel);
             did = true;
         }
         if (!did) sleep_ms(3);
@@ -741,8 +781,9 @@ void rr_destroy(rr_ctx_t *c) {
     /* Worker is gone: this thread now owns both ends of every ring. */
     rr_ready_t r;
     while (c->ready.pop(r)) free(r.buf.data);
-    float *p;
+    void *p;
     while (c->retired.pop(p)) free(p);
+    while (c->jobs_done.pop(p)) free(p);
     for (rr_folder_list_t *l : c->folder_lists) free(l);
     delete c;
 }
@@ -764,6 +805,7 @@ static Cmd make_cmd(int type) {
     cmd.mask = 0;
     cmd.flag = 0;
     cmd.f = 0.0f;
+    cmd.job = nullptr;
     cmd.path[0] = '\0';
     cmd.label[0] = '\0';
     return cmd;
@@ -810,7 +852,32 @@ int rr_load(rr_ctx_t *c, int pad, const char *path, int record_undo) {
     return enqueue(c, cmd);
 }
 
-int rr_undo(rr_ctx_t *c) { return enqueue(c, make_cmd(CMD_UNDO)); }
+int rr_undo(rr_ctx_t *c, uint32_t locked_mask) {
+    Cmd cmd = make_cmd(CMD_UNDO);
+    cmd.mask = locked_mask;
+    return enqueue(c, cmd);
+}
+
+int rr_job(rr_ctx_t *c, rr_job_fn fn, const char *path) {
+    if (!fn) return -1;
+    Cmd cmd = make_cmd(CMD_JOB);
+    cmd.job = fn;
+    snprintf(cmd.path, sizeof(cmd.path), "%s", path ? path : "");
+    return enqueue(c, cmd);
+}
+
+int rr_poll_job(rr_ctx_t *c, void **out) {
+    if (!c || !out) return 0;
+    if (!c->jobs_done.pop(*out)) return 0;
+    c->pending.fetch_sub(1, std::memory_order_acq_rel);   /* taken over from the worker */
+    return 1;
+}
+
+int rr_free_later(rr_ctx_t *c, void *p) {
+    if (!p) return 0;
+    if (!c) return -1;
+    return c->retired.push(p) ? 0 : -1;
+}
 
 int rr_commit(rr_ctx_t *c) { return enqueue(c, make_cmd(CMD_COMMIT)); }
 
@@ -822,7 +889,7 @@ int rr_poll(rr_ctx_t *c, rr_ready_t *out) {
 int rr_retire(rr_ctx_t *c, float *data) {
     if (!data) return 0;
     if (!c) return -1;
-    return c->retired.push(data) ? 0 : -1;
+    return c->retired.push((void *)data) ? 0 : -1;
 }
 
 rr_status_t rr_status(const rr_ctx_t *c) {

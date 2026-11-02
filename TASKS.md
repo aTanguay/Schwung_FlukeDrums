@@ -48,7 +48,8 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 ## Upstream & community
 
 - [ ] Send the realtime fixes to MrDrums as a standalone PR: async sample
-      loading + no allocation in `render_block`
+      loading, async preset parsing, no allocation in `render_block`, and the
+      soft-clip cliff fix
 - [ ] Ask handcraftedcc whether they want the roll-and-lock layer in MrDrums, or
       prefer FlukeDrums as its own module
 - [ ] Submit FlukeDrums to the Schwung module catalog (see
@@ -64,6 +65,9 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 
 ## Done
 
+- [x] Undo skips pads that are locked now or changed by hand since the roll
+- [x] Preset (`.ablpreset`) parsing moved off the audio thread (`rr_job`)
+- [x] Smooth output soft clip (upstream's had a 0.95 → 0.74 cliff)
 - [x] v0.3.0: renamed **Reroll → FlukeDrums** (module id `flukedrums`); log lines now `[flukedrums]`
 - [x] v0.2.0: **Folder picker** with counts (My / Core, 3 levels, 128 cap),
       **Up One**, Browse kept as fallback; coalesced pool changes when spinning

@@ -52,10 +52,12 @@ for the **whole device**, including Move's own tracks. So on those paths:
 `get_param` is called on every UI repaint, so it must only *format* data that
 already exists.
 
-Upstream MrDrums broke this in two places, both fixed here:
+Upstream MrDrums broke this in three places, all fixed here:
 1. it decoded WAV files inside `set_param`;
 2. `render_block` allocated two `std::vector`s per block (now stack scratch,
-   chunked at 256 frames).
+   chunked at 256 frames);
+3. it read and parsed `.ablpreset` files inside `set_param` (now a worker job;
+   only the parsed plan is applied on the audio thread).
 
 ## Threading model
 
@@ -90,6 +92,13 @@ Upstream MrDrums broke this in two places, both fixed here:
   release store. Old lists are kept until `rr_destroy`, so a pointer the audio
   thread loaded can never be freed or rewritten under it. Scans are rare, and
   capped at 64 per instance.
+- **Jobs.** `rr_job(fn, path)` runs any file work that isn't a sample decode
+  (today: preset parsing) on the worker. The result is one `malloc`'d block
+  that comes back through a `jobs_done` ring, gets applied in `render_block`,
+  and goes back through `retired` to be freed on the worker. The command
+  counts as busy until the audio side has polled the result, so `rr_busy`
+  can't drop between "parsed" and "applied". A later job with the same `fn`
+  supersedes a queued one (preset browsing).
 - **Fallback.** If the worker can't start, `inst->rr` is NULL and MrDrums'
   original synchronous loading is used.
 
@@ -105,7 +114,11 @@ Upstream MrDrums broke this in two places, both fixed here:
   length is then checked exactly against Max Len. The undo snapshot is recorded
   **only if something landed**, so a no-op roll can't push the oldest entry off
   a full undo stack.
-- **Undo.** 32-deep stack of 16-path snapshots. Only pads that differ reload.
+- **Undo.** 32-deep stack of steps, each a before *and* after 16-path
+  snapshot. Undo reverts a pad only if the step changed it, it isn't locked
+  now (the plugin passes the lock mask), and it still holds the step's
+  "after" path, so a pad you've replaced since keeps your pick. The step is
+  consumed either way, so Undo can never get stuck.
 - **Save Kit.** Creates `…/Samples/Schwung/FlukeDrums/Fluke YYYY-MM-DD HHMMSS/`,
   copies each pad as `NN <basename>`, and writes `flukedrums-kit.json` with sources.
 - **Folder scan.** Walks each library root (`My` → `UserLibrary/Samples`,
@@ -150,7 +163,7 @@ describe exactly this hazard in another module.)
 | Layer | How |
 |---|---|
 | Engine (`reroll.cpp`) | `tests/reroll_engine_test.cpp`, with a fake loader and simulated audio thread, under ASan/UBSan and TSan |
-| Full plugin | `tests/reroll_workflow_test.cpp` drives the real plugin API with generated WAVs: roll, lock, undo, roll pad, 40 rolls while playing, Save Kit, folder picker, Up One, knob-spin coalescing, state round-trip, destroy mid-roll |
+| Full plugin | `tests/reroll_workflow_test.cpp` drives the real plugin API with generated WAVs: roll, lock, undo (incl. locks and hand-picks), roll pad, 40 rolls while playing, Save Kit, folder picker, Up One, knob-spin coalescing, state round-trip, async preset load and browsing, soft-clip smoothness, destroy mid-roll |
 | ARM64 | the same tests cross-compiled with Zig and run under `qemu-aarch64`, plus a `dlopen` smoke test of the shipped `dsp.so` |
 | Device | manual, on a Move |
 
@@ -171,3 +184,6 @@ correct-but-slow roll look like a bug.
 | 2026-10-31 | Folder picker as a dynamic enum, not Schwung's file browser | The browser can't select folders, and its knob-turn view shows one folder's files with no way up |
 | 2026-11-01 | Menus in workflow order: Roll page first, knobs left to right as the steps (pool → roll → work → save); then Pad, Pad 2, Pool, Global | Schwung's planner had put Roll on page 2 behind duplicate tone knobs; checked with Schwung's own planner |
 | 2026-10-31 | Library roots: My + Core | Covers user samples and Ableton's library; Up One stops at the root so the pool can't swallow system folders |
+| 2026-11-02 | Undo skips locked pads and pads changed since the roll | Locking the one keeper and undoing the rest is the natural move; hand-picks aren't undo steps (browser preview would flood the stack), so undo must not clobber them either |
+| 2026-11-02 | Preset parsing as a generic worker job | Third realtime violation inherited from MrDrums; a generic `rr_job` keeps `reroll.cpp` free of MrDrums types |
+| 2026-11-02 | Continuous soft clip | Upstream's `tanh` above 0.95 had a 0.95 → 0.74 cliff; a value- and slope-matched knee removes it |

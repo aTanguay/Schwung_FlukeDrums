@@ -5,6 +5,7 @@
  * Build (see tests/run_tests.sh):
  *   g++ -std=c++14 -pthread -DREROLL_COMMIT_ROOT=... tests/reroll_workflow_test.cpp src/dsp/<all .cpp>
  */
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -82,6 +83,31 @@ static void write_wav(const std::string &path, float seconds, float freq) {
     std::fclose(f);
 }
 
+/* Constant full-scale sine, for driving the output stage into its clipper. */
+static void write_loud_wav(const std::string &path, float seconds, float freq) {
+    const int sr = 44100;
+    const int n = (int)(seconds * sr);
+    FILE *f = std::fopen(path.c_str(), "wb");
+    if (!f) { std::perror(path.c_str()); std::exit(2); }
+    auto u32 = [&](unsigned v) { std::fwrite(&v, 4, 1, f); };
+    auto u16 = [&](unsigned short v) { std::fwrite(&v, 2, 1, f); };
+    std::fwrite("RIFF", 1, 4, f); u32(36 + n * 2); std::fwrite("WAVE", 1, 4, f);
+    std::fwrite("fmt ", 1, 4, f); u32(16); u16(1); u16(1); u32(sr); u32(sr * 2); u16(2); u16(16);
+    std::fwrite("data", 1, 4, f); u32(n * 2);
+    for (int i = 0; i < n; i++) {
+        short s = (short)(std::sin(2.0 * M_PI * freq * i / sr) * 32767.0);
+        std::fwrite(&s, 2, 1, f);
+    }
+    std::fclose(f);
+}
+
+static void write_text(const std::string &path, const std::string &text) {
+    FILE *f = std::fopen(path.c_str(), "w");
+    if (!f) { std::perror(path.c_str()); std::exit(2); }
+    std::fputs(text.c_str(), f);
+    std::fclose(f);
+}
+
 static void mkdirs(const std::string &d) { std::string cmd = "mkdir -p '" + d + "'"; if (std::system(cmd.c_str())) std::exit(2); }
 
 /* ---- plugin helpers ---------------------------------------------------- */
@@ -93,6 +119,26 @@ static std::string get(void *inst, const char *key) {
 }
 
 static void set(void *inst, const char *key, const char *val) { api->set_param(inst, key, val); }
+
+static std::string err(void *inst) {
+    char buf[512];
+    buf[0] = 0;
+    api->get_error(inst, buf, (int)sizeof(buf));
+    return buf;
+}
+
+/* A file from the pool that isn't in either kit. */
+static std::string spare_file(const std::string &pool, const std::vector<std::string> &a, const std::vector<std::string> &b) {
+    for (int i = 0; i < 12; i++) {
+        std::string cand = pool + "/perc/p" + std::to_string(i) + ".wav";
+        if (std::find(a.begin(), a.end(), cand) == a.end() && std::find(b.begin(), b.end(), cand) == b.end()) return cand;
+    }
+    for (int i = 0; i < 14; i++) {
+        std::string cand = pool + "/kicks/k" + std::to_string(i) + ".wav";
+        if (std::find(a.begin(), a.end(), cand) == a.end() && std::find(b.begin(), b.end(), cand) == b.end()) return cand;
+    }
+    return "";
+}
 
 /* One audio block. Also hammers pads so swaps happen under playing voices. */
 static float render(void *inst) {
@@ -239,6 +285,33 @@ int main() {
     settle(inst);
     CHECK(pad_paths(inst) == roll1, "undo didn't restore roll1");
     CHECK(get(inst, "rr_undo_depth") == "1", "undo depth after undo: %s (roll1 stays undoable)", get(inst, "rr_undo_depth").c_str());
+
+    /* 5b. Undo leaves pads locked since the roll, and hand-picked pads, alone */
+    {
+        set(inst, "rr_roll", "Roll!");
+        settle(inst);
+        std::vector<std::string> rb = pad_paths(inst);
+        set(inst, "p06_lock", "on");                     /* liked what the roll gave pad 6 */
+        std::string pick = spare_file(pool, rb, roll1);
+        CHECK(!pick.empty(), "no spare file for the hand-pick");
+        set(inst, "p07_sample_path", pick.c_str());      /* replaced pad 7 by hand */
+        settle(inst);
+        CHECK(get(inst, "rr_undo_depth") == "2", "hand-pick changed undo depth: %s", get(inst, "rr_undo_depth").c_str());
+        set(inst, "rr_undo", "Undo!");
+        settle(inst);
+        std::vector<std::string> ru = pad_paths(inst);
+        CHECK(ru[5] == rb[5], "undo reverted locked pad 6");
+        CHECK(ru[6] == pick, "undo clobbered hand-picked pad 7: %s", ru[6].c_str());
+        for (int i = 0; i < 16; i++)
+            if (i != 5 && i != 6) CHECK(ru[i] == roll1[i], "undo didn't restore pad %d", i + 1);
+        CHECK(get(inst, "rr_undo_depth") == "1", "undo depth after 5b: %s", get(inst, "rr_undo_depth").c_str());
+
+        set(inst, "p06_lock", "off");
+        set(inst, "p06_sample_path", roll1[5].c_str());
+        set(inst, "p07_sample_path", roll1[6].c_str());
+        settle(inst);
+        CHECK(pad_paths(inst) == roll1, "couldn't put roll1 back after 5b");
+    }
 
     /* 6. Roll Pad: only the current pad (3) changes */
     set(inst, "ui_current_pad", "3");
@@ -411,6 +484,96 @@ int main() {
     for (int i = 0; i < 60; i++) peak = std::fmax(peak, render(inst2));
     CHECK(peak > 1000.0f, "no audio after restore (peak %.0f)", peak);
     CHECK(get(inst2, "rr_folder") == "Core (3)", "folder after restore: %s", get(inst2, "rr_folder").c_str());
+
+    /* 12b. Move kit presets: parsed on the worker, applied on the audio thread */
+    {
+        mkdirs(root + "/presets/rel");
+        write_wav(root + "/presets/rel/snare one.wav", 0.2f, 330);
+        auto preset = [&](const std::string &kick_uri) {
+            return std::string("{ \"kind\": \"instrumentRack\", \"chains\": [ { \"devices\": [ {\n"
+                               "  \"kind\": \"drumRack\", \"chains\": [\n"
+                               "  { \"drumZoneSettings\": { \"receivingNote\": 36, \"chokeGroup\": null },\n"
+                               "    \"devices\": [ { \"kind\": \"drumCell\", \"parameters\": { \"Volume\": 0 },\n"
+                               "      \"deviceData\": { \"sampleUri\": \"") + kick_uri + "\" } } ] },\n"
+                               "  { \"drumZoneSettings\": { \"receivingNote\": 37, \"chokeGroup\": 2 },\n"
+                               "    \"devices\": [ { \"kind\": \"drumCell\", \"parameters\": { \"Pan\": 0.5, \"Volume\": -12 },\n"
+                               "      \"deviceData\": { \"sampleUri\": \"rel/snare%20one.wav\" } } ] }\n"
+                               "] } ] } ] }\n";
+        };
+        const std::string kit_a = root + "/presets/A.ablpreset";
+        const std::string kit_b = root + "/presets/B.ablpreset";
+        write_text(kit_a, preset(pool + "/kicks/k1.wav"));
+        write_text(kit_b, preset(pool + "/kicks/k2.wav"));
+
+        set(inst2, "p01_vol", "0.5");
+        set(inst2, "ui_preset_path", kit_a.c_str());
+        /* set_param returned without reading the file: nothing applied yet */
+        CHECK(get(inst2, "p01_vol") == "0.5000", "preset applied synchronously (p01_vol %s)", get(inst2, "p01_vol").c_str());
+        settle(inst2);
+        CHECK(get(inst2, "p01_sample_path") == pool + "/kicks/k1.wav", "preset pad 1: %s", get(inst2, "p01_sample_path").c_str());
+        CHECK(get(inst2, "p01_vol") == "2.0000", "preset pad 1 vol: %s", get(inst2, "p01_vol").c_str());
+        CHECK(get(inst2, "p02_sample_path") == root + "/presets/rel/snare one.wav", "preset relative uri: %s",
+              get(inst2, "p02_sample_path").c_str());
+        CHECK(get(inst2, "p02_pan") == "0.5000" && get(inst2, "p02_choke_group") == "2", "preset pad 2 params");
+        CHECK(err(inst2).empty(), "preset error: %s", err(inst2).c_str());
+        peak = 0.0f;
+        for (int i = 0; i < 60; i++) peak = std::fmax(peak, render(inst2));
+        CHECK(peak > 1000.0f, "no audio after preset (peak %.0f)", peak);
+
+        /* browsing presets: one load per cursor step, the last one wins */
+        for (int k = 0; k < 4; k++) {
+            set(inst2, "ui_preset_path", kit_a.c_str());
+            set(inst2, "ui_preset_path", kit_b.c_str());
+        }
+        settle(inst2);
+        CHECK(get(inst2, "p01_sample_path") == pool + "/kicks/k2.wav", "preset browse: %s", get(inst2, "p01_sample_path").c_str());
+
+        /* broken presets report an error and change nothing */
+        std::vector<std::string> before_bad = pad_paths(inst2);
+        write_text(root + "/presets/bad.ablpreset", "{ \"kind\": \"drumRack\", \"chains\": [ ");
+        set(inst2, "ui_preset_path", (root + "/presets/bad.ablpreset").c_str());
+        settle(inst2);
+        CHECK(!err(inst2).empty(), "broken preset gave no error");
+        set(inst2, "ui_preset_path", (root + "/presets/missing.ablpreset").c_str());
+        settle(inst2);
+        CHECK(err(inst2) == "Could not open preset file", "missing preset error: %s", err(inst2).c_str());
+        CHECK(pad_paths(inst2) == before_bad, "a failed preset changed pads");
+    }
+
+    /* 12c. Output soft clip: driven hard, the output saturates smoothly. The
+     * old clipper dropped 0.951 to 0.740, a ~6900-step cliff on every peak. */
+    {
+        write_loud_wav(root + "/loud.wav", 0.5f, 50.0f);
+        void *inst3 = api->create_instance(root.c_str(), "{}");
+        set(inst3, "p01_sample_path", (root + "/loud.wav").c_str());
+        set(inst3, "p01_vol", "2");
+        set(inst3, "p01_decay_ms", "2000");
+        set(inst3, "g_master_vol", "2");
+        settle(inst3);
+        set(inst3, "all_notes_off", "1");
+        short out[128 * 2];
+        for (int i = 0; i < 2000; i++) {   /* let anything still sounding finish */
+            api->render_block(inst3, out, 128);
+            bool silent = true;
+            for (int s = 0; s < 256; s++) silent = silent && out[s] == 0;
+            if (silent) break;
+        }
+        unsigned char on[3] = {0x90, 36, 127};
+        api->on_midi(inst3, on, 3, 0);
+        int peak3 = 0, max_step = 0, prev = 0;
+        for (int b = 0; b < 100; b++) {
+            api->render_block(inst3, out, 128);
+            for (int s = 0; s < 128; s++) {
+                int v = out[s * 2];
+                peak3 = std::max(peak3, std::abs(v));
+                max_step = std::max(max_step, std::abs(v - prev));
+                prev = v;
+            }
+        }
+        CHECK(peak3 > 31000, "clipper never engaged (peak %d)", peak3);
+        CHECK(max_step < 2500, "output jumped %d in one sample: clipper isn't smooth", max_step);
+        api->destroy_instance(inst3);
+    }
 
     /* 13. UI contracts are valid JSON-ish and under the 64 KB param limit */
     std::string cp = get(inst2, "chain_params");

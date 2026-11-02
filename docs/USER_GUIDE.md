@@ -123,11 +123,16 @@ the pool and the folder list.
 | **Roll** | New random sample on every **unlocked** pad. Picks are unique within a roll when the pool allows. |
 | **Roll Pad** | Reroll only the current pad (unless it's locked). |
 | **Lock** / knob 5 | Clockwise locks the current pad, counter-clockwise unlocks it. Locked pads are never touched by Roll. |
-| **Undo Roll** | Restore the kit from before the last roll or Roll Pad. Up to 32 steps. |
+| **Undo Roll** | Put back the pads the last roll or Roll Pad changed. Up to 32 steps. Pads you've locked or picked by hand since are left alone. |
 | **Unlock All** | Clear every lock (Pool page). |
 
 **Which pad is "current"?** With **Auto Select** on (the default), the last
 pad you hit. So the flow is: hit a pad, hear it, turn knob 5.
+
+**Undo and locks.** A roll that ruined three pads but gave you one great one?
+Lock the great one, then Undo: the other pads go back, the keeper stays. The
+same goes for a pad you replaced by hand after the roll. Each Undo uses up one
+step, even if every pad it would revert was locked or changed.
 
 On the first page, **Roll** (knob 4), **Roll Pad** (6), **Undo** (7) and
 **Save Kit** (8) fire from a single turn of their knob: one flick is one press,

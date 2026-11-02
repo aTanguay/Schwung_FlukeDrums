@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- **Undo respects locks and your edits.** Undo now puts back only the pads
+  the last roll changed, and skips any pad you've locked since or replaced by
+  hand. Lock the one good hit from a bad roll, then Undo: the keeper stays.
+
+### Fixed
+- **Distortion on loud kits.** The output soft clip (inherited from MrDrums)
+  dropped anything just over 0.95 down to 0.74, folding every hot peak into a
+  notch. It now saturates smoothly toward full scale.
+- **Loading a Move kit preset no longer reads the file on the audio thread.**
+  The `.ablpreset` is parsed in the background and applied on the next audio
+  block; browsing presets quickly only loads the one you land on. A preset
+  with an unsupported sample link now changes nothing (it used to apply the
+  pads listed before that link, then stop).
+
 ## 0.4.0 — 2026-11-01
 
 ### Changed
