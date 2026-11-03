@@ -1,6 +1,6 @@
 # FlukeDrums 
 
-**A drum machine built on lucky accidents, for Schwung/Ableton Move.**
+**A Schwung drum machine built on 'happy accidents'.**
 
 FlukeDrums is a [Schwung](https://schwung.dev) module that fills Move's 16 pads with
 random samples pulled from a folder you choose...including subfolders. Built from the excellent 'Mr Drums'
