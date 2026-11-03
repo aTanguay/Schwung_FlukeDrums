@@ -37,8 +37,8 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
       `.ablpreset` writer in its `lib/`.
 - [ ] **Stay in the family**: reroll a pad from the same folder as its
       current sample
-- [ ] **Row filters**: tag pad rows by name ("kick", "snare", "hat") so each
-      row rolls from matching files
+- [ ] **Kit Mode options**: choose the layout (e.g. 4 kit rows), edit the
+      name table, or a "role per pad" override
 - [ ] **Roll intensity**: reroll only N random unlocked pads
 - [ ] **Seeded rolls**: a seed number so a roll can be shared and reproduced
 - [ ] More library roots (e.g. a user-configurable extra folder via
@@ -65,6 +65,8 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 
 ## Done
 
+- [x] **Kit Mode**: pads 1-8 roll a real kit by sample name (word matching,
+      folder fallback, part fallbacks), Kit Parts readout, Roll Pad keeps the part
 - [x] Undo skips pads that are locked now or changed by hand since the roll
 - [x] Preset (`.ablpreset`) parsing moved off the audio thread (`rr_job`)
 - [x] Smooth output soft clip (upstream's had a 0.95 → 0.74 cliff)

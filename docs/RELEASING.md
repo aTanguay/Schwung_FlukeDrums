@@ -69,7 +69,7 @@ array:
     {
       "id": "flukedrums",
       "name": "FlukeDrums",
-      "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit",
+      "description": "A drum machine built on happy accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit",
       "author": "Andy Tanguay",
       "component_type": "sound_generator",
       "subcategory": "drum-machine",

@@ -49,7 +49,7 @@ Jog moves between five pages, ordered the way you'll use them:
 | 1 | **Roll** | Folder · Up One · Max Len · Roll | Lock · Roll Pad · Undo · Save Kit |
 | 2 | **Pad** | Vol · Pan · Tune · Start | Attack · Decay · Choke · Mode |
 | 3 | **Pad 2** | Sample · Rand Pan · Rand Vol · Rand Decay | Chance |
-| 4 | **Pool** | Subfolders · Rescan · Browse · Unlock All | Pool Size · Undos · Status · Last Kit |
+| 4 | **Pool** | Kit Mode · Subfolders · Rescan · Browse | Unlock All · Pool Size · Kit Parts · Status |
 | 5 | **Global** | Master Vol · Polyphony · Vel Curve · Humanize | Rand Seed · Rand Loop |
 
 Page 1 holds the whole loop, and its knobs read left to right as the steps
@@ -143,6 +143,36 @@ bumped Roll knob can't take it out.
 Rolls load in the background. Pads update within a fraction of a second, and
 you can keep playing while they do. A pad that's still ringing finishes on its
 old sample.
+
+## Kit Mode: a real kit, then wild cards
+
+With **Kit Mode** on (Pool page, knob 1; on by default), the bottom two rows of
+pads roll the parts of a drum kit, and the top two rows stay completely random:
+
+| | | | | |
+|---|---|---|---|---|
+| **Row 2** | 5 closed hat | 6 open hat | 7 crash / ride | 8 tom / perc |
+| **Row 1** | 1 kick | 2 kick | 3 snare | 4 clap |
+| **Rows 3–4** | 9–16: anything from the pool | | | |
+
+FlukeDrums tells what a sample is from its **name**, the way sample packs name
+things: `Kick`, `BD`, `Snare`, `SD`, `Clap`, `CP`, `HH`, `OHH`, `Crash`, `Ride`,
+`Tom`, `LT`, `Perc`, `Conga` and many more. It reads words, not letters inside
+words, so `808BD_01` is a kick and `ABDUCT` isn't. If a file's name says
+nothing, its folder decides (`Kicks/thump.wav` is a kick), then the folder
+above. Anything named like a loop, break, fill or vocal is never used as a
+kit part (it can still turn up on pads 9–16).
+
+When a part has no match, it borrows a neighbour: no claps → a snare, no open
+hats → a closed hat, no toms → perc, crash ↔ ride. If there's still nothing, the
+pad rolls at random, exactly like Kit Mode off.
+
+- **Roll Pad keeps the part**: rerolling pad 3 gives you another snare.
+- **Kit Parts** (Pool page) shows how many of the 8 parts your pool can fill,
+  e.g. `6/8`. Low numbers mean your files are named in ways FlukeDrums doesn't
+  recognise (or the pool is one kind of sound, like all kicks).
+- Locks win: a locked pad keeps its sample whatever part its position asks for.
+- No sample appears twice in a kit when the pool has enough to go round.
 
 ## Saving a kit
 

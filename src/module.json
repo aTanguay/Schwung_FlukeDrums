@@ -20,7 +20,8 @@
   "ui_pad_page": "main",
   "rr_pool_dir": "/data/UserData/UserLibrary/Samples",
   "rr_recursive": "on",
-  "rr_max_len": 2.0
+  "rr_max_len": 2.0,
+  "rr_kit_mode": "on"
  },
  "capabilities": {
   "audio_out": true,
@@ -102,6 +103,7 @@
     "pool": {
      "name": "Pool",
      "params": [
+      "rr_kit_mode",
       "rr_folder",
       "rr_pool_up",
       "rr_max_len",
@@ -110,19 +112,20 @@
       "rr_pool_dir",
       "rr_unlock_all",
       "rr_pool_count",
-      "rr_undo_depth",
+      "rr_kit_parts",
       "rr_status",
+      "rr_undo_depth",
       "rr_last_kit"
      ],
      "knobs": [
+      "rr_kit_mode",
       "rr_recursive",
       "rr_rescan",
       "rr_pool_dir",
       "rr_unlock_all",
       "rr_pool_count",
-      "rr_undo_depth",
-      "rr_status",
-      "rr_last_kit"
+      "rr_kit_parts",
+      "rr_status"
      ]
     },
     "global": {

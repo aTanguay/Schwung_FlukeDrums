@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- **Kit Mode** (Pool page, knob 1; on by default). The bottom two rows of pads
+  now roll a real kit, found by sample names: pads 1–2 kick, 3 snare, 4 clap,
+  5 closed hat, 6 open hat, 7 crash/ride, 8 tom/perc. The top two rows stay
+  completely random. Names are matched by word, so `808BD_01`, `KickHard`,
+  `Kicks/thump.wav` and Ableton's `Drums/Kick/...` all count as kicks, and
+  `ABDUCT.wav` doesn't. Loops, breaks, fills and vocals are never taken for
+  hits. A part with no match borrows a neighbour (no claps → a snare, no open
+  hats → a closed hat, no toms → perc) and otherwise goes random.
+- **Roll Pad keeps the pad's part**: rerolling the snare pad gives another snare.
+- **Kit Parts** readout (Pool page): how many of the 8 kit parts your current
+  pool can fill by name, e.g. `6/8`.
+- Saved kits' `flukedrums-kit.json` now says what each pad is (`"kind": "kick"`).
+
+### Changed
+- Rolls avoid any sample already in the kit, including locked pads (they
+  used to avoid only this roll's picks).
+- Pool page: Kit Mode is knob 1 and Kit Parts replaces Undos on the knobs;
+  Undos and Last Kit move to the page after it.
+
 ## 0.4.1 — 2026-11-02
 
 ### Changed

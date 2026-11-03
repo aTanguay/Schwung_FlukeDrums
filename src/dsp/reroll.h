@@ -37,6 +37,23 @@ enum {
     RR_FOLDER_DEPTH = 3       /* list folders up to this many levels below a root */
 };
 
+/* Kit roles: what a sample is, guessed from its file (or folder) name. In Kit
+ * Mode the bottom two rows of pads each ask for one (see rr_kit_role). */
+enum {
+    RR_ROLE_NONE = 0,
+    RR_ROLE_KICK,
+    RR_ROLE_SNARE,
+    RR_ROLE_CLAP,
+    RR_ROLE_HAT_CLOSED,
+    RR_ROLE_HAT_OPEN,
+    RR_ROLE_CRASH,
+    RR_ROLE_RIDE,
+    RR_ROLE_TOM,
+    RR_ROLE_PERC,
+    RR_ROLE_COUNT,
+    RR_KIT_SLOTS = 8          /* pads 1-8 follow the kit; 9-16 stay random */
+};
+
 /* One pickable pool folder. files counts audio in it AND all subfolders. */
 typedef struct {
     char label[RR_FOLDER_LABEL_MAX];  /* "My/Drums/Kicks (412)" — unique within a list */
@@ -103,6 +120,7 @@ RR_API void rr_destroy(rr_ctx_t *ctx);
 /* ---- AUDIO-SAFE: queue commands. Return 0 if queued, -1 if the ring is full. */
 RR_API int rr_set_pool(rr_ctx_t *ctx, const char *dir, int recursive);  /* (re)scans */
 RR_API int rr_set_max_len(rr_ctx_t *ctx, float seconds);                /* <=0: no limit */
+RR_API int rr_set_kit_mode(rr_ctx_t *ctx, int on);                      /* default on */
 RR_API int rr_roll(rr_ctx_t *ctx, uint32_t pad_mask);                   /* bit 0 = pad 1 */
 RR_API int rr_load(rr_ctx_t *ctx, int pad, const char *path, int record_undo); /* "" clears */
 /* Undo the last roll, but only on pads that roll changed, that aren't in
@@ -137,6 +155,18 @@ RR_API int rr_last_commit_name(const rr_ctx_t *ctx, char *buf, int buf_len);
 RR_API const rr_folder_list_t *rr_folders(const rr_ctx_t *ctx);
 
 RR_API const char *rr_status_label(rr_status_t st);
+
+/* ---- Kit roles. */
+/* Pool files the last scan classified as `role` (AUDIO-SAFE). */
+RR_API int rr_role_count(const rr_ctx_t *ctx, int role);
+/* The role pad `pad` (1-based) asks for in Kit Mode; RR_ROLE_NONE = random. */
+RR_API int rr_kit_role(int pad);
+/* The role tried when `role` has no files (snare <-> clap, ...), or NONE. */
+RR_API int rr_role_fallback(int role);
+RR_API const char *rr_role_name(int role);
+/* Guess a file's role from its name, then its folder, then the folder above.
+ * NOT audio-safe (allocates): worker thread and tests only. */
+RR_API int rr_classify(const char *path);
 
 #ifdef __cplusplus
 }

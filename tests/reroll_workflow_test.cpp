@@ -261,6 +261,22 @@ int main() {
     }
     CHECK(get(inst, "rr_undo_depth") == "1", "undo depth after roll1: %s", get(inst, "rr_undo_depth").c_str());
 
+    /* 3b. Kit Mode (on by default): pads 1-8 follow the kit by name. The pool
+     * has kicks/, snares/deep/ and perc/ (named by folder); no hats, claps,
+     * cymbals or toms, so clap -> snare and tom -> perc, hats and cymbal random. */
+    CHECK(get(inst, "rr_kit_mode") == "on", "kit mode default: %s", get(inst, "rr_kit_mode").c_str());
+    CHECK(get(inst, "rr_kit_parts") == "5/8", "kit parts: %s", get(inst, "rr_kit_parts").c_str());
+    CHECK(starts_with(roll1[0], pool + "/kicks/") && starts_with(roll1[1], pool + "/kicks/"), "pads 1-2 not kicks");
+    CHECK(starts_with(roll1[2], pool + "/snares/") && starts_with(roll1[3], pool + "/snares/"), "pads 3-4 not snares");
+    CHECK(starts_with(roll1[7], pool + "/perc/"), "pad 8 not perc: %s", roll1[7].c_str());
+    {
+        std::string cpk = get(inst, "chain_params");
+        CHECK(cpk.find("\"rr_kit_mode\"") != std::string::npos && cpk.find("\"rr_kit_parts\"") != std::string::npos,
+              "chain_params missing Kit Mode / Kit Parts");
+        std::string hk = get(inst, "ui_hierarchy");
+        CHECK(hk.find("\"knobs\":[\"rr_kit_mode\"") != std::string::npos, "Kit Mode isn't knob 1 on the Pool page");
+    }
+
     float peak = 0.0f;
     for (int i = 0; i < 60; i++) peak = std::fmax(peak, render(inst));
     CHECK(peak > 1000.0f, "no audio after roll (peak %.0f)", peak);
@@ -322,6 +338,7 @@ int main() {
         if (i == 2) CHECK(roll3[i] != roll1[i], "roll_pad didn't change pad 3");
         else CHECK(roll3[i] == roll1[i], "roll_pad changed pad %d", i + 1);
     }
+    CHECK(starts_with(roll3[2], pool + "/snares/"), "Roll Pad on the snare pad gave %s", roll3[2].c_str());
     /* ...and a locked current pad is left alone */
     set(inst, "ui_current_pad", "5");
     set(inst, "rr_roll_pad", "Roll!");
@@ -338,6 +355,20 @@ int main() {
     CHECK(stressed[0] == roll1[0] && stressed[4] == roll1[4], "locks broke under stress");
     CHECK(get(inst, "rr_undo_depth") == "32", "undo depth caps at 32, got %s", get(inst, "rr_undo_depth").c_str());
 
+    /* 7b. Kit Mode off: pad 2 is no longer always a kick (14 of 43 files are) */
+    set(inst, "rr_kit_mode", "off");
+    CHECK(get(inst, "rr_kit_mode") == "off", "kit mode off: %s", get(inst, "rr_kit_mode").c_str());
+    {
+        int non_kick = 0;
+        for (int k = 0; k < 10; k++) {
+            set(inst, "rr_roll", "Roll!");
+            settle(inst);
+            non_kick += !starts_with(pad_paths(inst)[1], pool + "/kicks/");
+        }
+        CHECK(non_kick > 0, "kit mode off still always rolled a kick on pad 2");
+    }
+    set(inst, "rr_kit_mode", "on");
+
     /* 8. Commit: 16 files + manifest, never re-pooled */
     set(inst, "rr_commit", "Save!");
     settle(inst);
@@ -350,6 +381,13 @@ int main() {
           count_files(kitdir, ".wav") + count_files(kitdir, ".WAV"));
     struct stat st;
     CHECK(stat((kitdir + "/flukedrums-kit.json").c_str(), &st) == 0 && st.st_size > 100, "manifest missing");
+    {
+        std::string man;
+        FILE *mf = std::fopen((kitdir + "/flukedrums-kit.json").c_str(), "r");
+        if (mf) { char b[4096]; size_t n; while ((n = std::fread(b, 1, sizeof b, mf)) > 0) man.append(b, n); std::fclose(mf); }
+        /* pad 1 is locked to roll1's kick */
+        CHECK(man.find("\"kind\": \"kick\"") != std::string::npos, "manifest doesn't name pad kinds");
+    }
     set(inst, "rr_rescan", "Scan!");
     settle(inst);
     CHECK(get(inst, "rr_pool_count") == std::to_string(short_count + 3), "commit leaked into pool: %s",
@@ -471,6 +509,7 @@ int main() {
 
     /* 12. State round-trip into a fresh instance */
     set(inst, "p09_lock", "on");
+    set(inst, "rr_kit_mode", "off");
     std::string state = get(inst, "state");
     std::vector<std::string> saved = pad_paths(inst);
     api->destroy_instance(inst);
@@ -479,6 +518,7 @@ int main() {
     settle(inst2);
     CHECK(pad_paths(inst2) == saved, "state restore lost pad paths");
     CHECK(get(inst2, "p09_lock") == "on", "state restore lost lock");
+    CHECK(get(inst2, "rr_kit_mode") == "off", "state restore lost kit mode: %s", get(inst2, "rr_kit_mode").c_str());
     CHECK(get(inst2, "rr_pool_dir") == longpool, "state restore lost pool: %s", get(inst2, "rr_pool_dir").c_str());
     peak = 0.0f;
     for (int i = 0; i < 60; i++) peak = std::fmax(peak, render(inst2));

@@ -26,6 +26,8 @@ It's a happy-accident machine. You don't build a kit, you find one.
 - **Undo Roll**, 32 levels deep, for when you rolled away something good
 - **Folder picker** with sample counts: your Samples (`My`) or Ableton's
   library (`Core`), up to three levels deep, with subfolders included
+- **Kit Mode**: the bottom two rows roll a real kit (kick, snare, clap,
+  hats, cymbal, tom) found by sample names; the top two rows stay wild
 - **Max Len** filter keeps 4-minute stems out of your kick slot
 - **Save Kit** writes the 16 files and a manifest of where each came from
 - Everything [MrDrums](https://github.com/handcraftedcc/schwung-mrdrums) does:
@@ -93,8 +95,8 @@ Roll, Undo and Save Kit fire from a single turn of their knob (one flick = one p
 
 **3. Pad 2**: the pad's Sample (pick by hand), plus Rand Pan, Rand Vol, Rand Decay and Chance.
 
-**4. Pool**: Subfolders, Rescan, Browse (deeper folders), Unlock All, and readouts:
-Pool Size, Undos, Status, Last Kit.
+**4. Pool**: Kit Mode, Subfolders, Rescan, Browse (deeper folders), Unlock All, and readouts:
+Pool Size, Kit Parts, Status (Undos and Last Kit on the page after).
 
 **5. Global**: master volume, polyphony, velocity curve, humanize.
 

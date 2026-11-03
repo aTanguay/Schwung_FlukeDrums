@@ -108,6 +108,7 @@ typedef struct {
     char rr_pool_dir[512];
     int rr_recursive;
     float rr_max_len;
+    int rr_kit_mode;
     /* buffers swapped off a pad that a voice may still be reading */
     float *retired[REROLL_MAX_RETIRED];
     int retired_count;
@@ -1519,6 +1520,11 @@ static int set_param_value(mrdrums_instance_t *inst, const char *key, const char
         if (inst->rr && !inst->restoring) rr_set_max_len(inst->rr, inst->rr_max_len);
         return 1;
     }
+    if (strcmp(key, "rr_kit_mode") == 0) {
+        inst->rr_kit_mode = parse_on_off(val);
+        if (inst->rr && !inst->restoring) rr_set_kit_mode(inst->rr, inst->rr_kit_mode);
+        return 1;
+    }
 
     /* ---- FlukeDrums triggers (never persisted). Fire on the option name or
      * index 1; index 0 / "-" means "do nothing" so a stray write is harmless. */
@@ -1673,6 +1679,17 @@ static int get_param_value(mrdrums_instance_t *inst, const char *key, char *buf,
     if (strcmp(key, "rr_pool_dir") == 0) return snprintf(buf, buf_len, "%s", inst->rr_pool_dir);
     if (strcmp(key, "rr_recursive") == 0) return snprintf(buf, buf_len, "%s", on_off_to_string(inst->rr_recursive));
     if (strcmp(key, "rr_max_len") == 0) return snprintf(buf, buf_len, "%.4f", inst->rr_max_len);
+    if (strcmp(key, "rr_kit_mode") == 0) return snprintf(buf, buf_len, "%s", on_off_to_string(inst->rr_kit_mode));
+    if (strcmp(key, "rr_kit_parts") == 0) {
+        /* How many of the 8 kit slots the pool can fill by name (its own part
+         * or the fallback). Formats counts the last scan stored: audio-safe. */
+        int found = 0;
+        for (int p = 1; p <= RR_KIT_SLOTS && inst->rr; p++) {
+            const int role = rr_kit_role(p);
+            if (rr_role_count(inst->rr, role) > 0 || rr_role_count(inst->rr, rr_role_fallback(role)) > 0) found++;
+        }
+        return snprintf(buf, buf_len, "%d/%d", found, RR_KIT_SLOTS);
+    }
     if (strcmp(key, "rr_status") == 0) {
         if (!inst->rr) return snprintf(buf, buf_len, "Worker off");
         rr_status_t st = rr_status(inst->rr);
@@ -1869,6 +1886,7 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     inst->ui_pad_page = 0;
     inst->rr_recursive = 1;
     inst->rr_max_len = 2.0f;
+    inst->rr_kit_mode = 1;
     set_error(inst, NULL);
 
     /* Start the worker first so every sample load below takes the async path.
@@ -1883,6 +1901,7 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     inst->restoring = 0;
     if (inst->rr) {
         rr_set_max_len(inst->rr, inst->rr_max_len);
+        rr_set_kit_mode(inst->rr, inst->rr_kit_mode);
         rr_set_pool(inst->rr, inst->rr_pool_dir, inst->rr_recursive);
         rr_add_folder_root(inst->rr, REROLL_ROOT_MY, "My");
         rr_add_folder_root(inst->rr, REROLL_ROOT_CORE, "Core");
@@ -2219,7 +2238,8 @@ static int build_chain_params_json(mrdrums_instance_t *inst, char *buf, int buf_
                        "{\"key\":\"rr_status\",\"name\":\"Status\",\"type\":\"string\",\"access\":\"read\"},"
                        "{\"key\":\"rr_last_kit\",\"name\":\"Last Kit\",\"type\":\"string\",\"access\":\"read\"},"
                        "{\"key\":\"rr_pool_count\",\"name\":\"Pool Size\",\"type\":\"int\",\"min\":0,\"max\":200000,\"access\":\"read\"},"
-                       "{\"key\":\"rr_undo_depth\",\"name\":\"Undos\",\"type\":\"int\",\"min\":0,\"max\":32,\"access\":\"read\"}");
+                       "{\"key\":\"rr_undo_depth\",\"name\":\"Undos\",\"type\":\"int\",\"min\":0,\"max\":32,\"access\":\"read\"},"
+                       "{\"key\":\"rr_kit_parts\",\"name\":\"Kit Parts\",\"type\":\"string\",\"access\":\"read\"}");
 
     /* Folder picker: a dynamic enum whose options are the worker's latest
      * folder list. Names go both ways on the wire (options_as_string), and
@@ -2292,12 +2312,14 @@ static int build_ui_hierarchy(mrdrums_instance_t *inst, char *buf, int buf_len) 
                                "\"pad_sample_path\",\"pad_rand_pan_amt\",\"pad_rand_vol_amt\",\"pad_rand_decay_amt\",\"pad_chance_pct\"],"
                     "\"knobs\":[\"pad_vol\",\"pad_pan\",\"pad_tune\",\"pad_start\",\"pad_attack_ms\",\"pad_decay_ms\",\"pad_choke_group\",\"pad_mode\"]"
                 "},"
+                /* Pool: set-and-forget pool and kit settings, then readouts.
+                 * Undos and Last Kit have no knob and spill onto an extra page. */
                 "\"pool\":{"
                     "\"name\":\"Pool\","
-                    "\"params\":[\"rr_folder\",\"rr_pool_up\",\"rr_max_len\","
+                    "\"params\":[\"rr_kit_mode\",\"rr_folder\",\"rr_pool_up\",\"rr_max_len\","
                                "\"rr_recursive\",\"rr_rescan\",\"rr_pool_dir\",\"rr_unlock_all\","
-                               "\"rr_pool_count\",\"rr_undo_depth\",\"rr_status\",\"rr_last_kit\"],"
-                    "\"knobs\":[\"rr_recursive\",\"rr_rescan\",\"rr_pool_dir\",\"rr_unlock_all\",\"rr_pool_count\",\"rr_undo_depth\",\"rr_status\",\"rr_last_kit\"]"
+                               "\"rr_pool_count\",\"rr_kit_parts\",\"rr_status\",\"rr_undo_depth\",\"rr_last_kit\"],"
+                    "\"knobs\":[\"rr_kit_mode\",\"rr_recursive\",\"rr_rescan\",\"rr_pool_dir\",\"rr_unlock_all\",\"rr_pool_count\",\"rr_kit_parts\",\"rr_status\"]"
                 "},"
                 "\"global\":{"
                     "\"name\":\"Global\","

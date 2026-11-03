@@ -108,12 +108,26 @@ Upstream MrDrums broke this in three places, all fixed here:
   It skips dot-files (including macOS `._` junk), never follows directory
   symlinks, and always skips the Save Kit folder so saved kits don't feed back
   into the pool.
-- **Roll(mask).** For each pad in the mask, it tries up to 24 random
-  candidates, preferring files not already on that pad or elsewhere in this
-  roll. A cheap size check skips obvious stems before decoding, and the decoded
+- **Roll(mask).** For each pad in the mask, in Kit Mode it first tries the
+  pad's part (see Kit Mode roll below), then up to 24 random candidates,
+  preferring files not already anywhere in the kit. A cheap size check skips obvious stems before decoding, and the decoded
   length is then checked exactly against Max Len. The undo snapshot is recorded
   **only if something landed**, so a no-op roll can't push the oldest entry off
   a full undo stack.
+- **Kit roles.** Each pooled file is classified once, at scan time
+  (`rr_classify`): its name is split into words (on punctuation, digit/letter
+  and camelCase boundaries), each word and each joined pair of neighbours is
+  looked up in a table of names and abbreviations, and the most specific drum
+  wins. A name that says nothing defers to its folder, then the folder above;
+  a loop/break/fill/vocal word in the name or folder means "not a hit". Fixed
+  buffers, no allocation: about 1.5 µs a file on a desktop ARM core. The scan
+  keeps a per-role index list.
+- **Kit Mode roll.** Pads 1–8 ask for a role (`rr_kit_role`); the roll walks
+  that role's list, then its fallback's (`rr_role_fallback`), in a shuffled
+  order (random start, random step coprime to the list size), so a role with
+  one unused file left always finds it, with no allocation. Up to 16 decodes per
+  role, then the normal random attempts. Every phase skips files already in
+  the kit (all 16 pads, locked ones included).
 - **Undo.** 32-deep stack of steps, each a before *and* after 16-path
   snapshot. Undo reverts a pad only if the step changed it, it isn't locked
   now (the plugin passes the lock mask), and it still holds the step's
@@ -134,10 +148,11 @@ Upstream MrDrums broke this in three places, all fixed here:
 | `rr_pool_dir` | filepath; a picked file is reduced to its folder | yes |
 | `rr_recursive` | enum off/on | yes |
 | `rr_max_len` | float 0–10 s | yes |
+| `rr_kit_mode` | enum off/on (default on) | yes |
 | `p01_lock`…`p16_lock`, alias `pad_lock` | enum off/on | yes |
 | `rr_folder` | dynamic enum, `options_as_string`; label ↔ path | via `rr_pool_dir` |
 | `rr_roll`, `rr_roll_pad`, `rr_undo`, `rr_commit`, `rr_rescan`, `rr_unlock_all`, `rr_pool_up` | trigger: `access:"write"`, options `["-","Roll!"]` | no |
-| `rr_status`, `rr_last_kit`, `rr_pool_count`, `rr_undo_depth`, `rr_busy` | readout: `access:"read"` | no |
+| `rr_status`, `rr_last_kit`, `rr_pool_count`, `rr_undo_depth`, `rr_kit_parts`, `rr_busy` | readout: `access:"read"` | no |
 
 Triggers fire on their option name or index `1`. A value of `"-"` or `"0"`
 does nothing, so a stray index-0 write can't wipe a kit. (Schwung's docs
@@ -186,4 +201,5 @@ correct-but-slow roll look like a bug.
 | 2026-10-31 | Library roots: My + Core | Covers user samples and Ableton's library; Up One stops at the root so the pool can't swallow system folders |
 | 2026-11-02 | Undo skips locked pads and pads changed since the roll | Locking the one keeper and undoing the rest is the natural move; hand-picks aren't undo steps (browser preview would flood the stack), so undo must not clobber them either |
 | 2026-11-02 | Preset parsing as a generic worker job | Third realtime violation inherited from MrDrums; a generic `rr_job` keeps `reroll.cpp` free of MrDrums types |
+| 2026-11-02 | Kit Mode: roles by sample name, bottom two rows only | Ported from Andy's MPC RandoKitter idea: half the pads make a playable kit, half stay wild. Word matching (not substring) so `BD` can't match `ABDUCT`; folder fallback because packs and Ableton's library name folders, not files |
 | 2026-11-02 | Continuous soft clip | Upstream's `tanh` above 0.95 had a 0.95 → 0.74 cliff; a value- and slope-matched knee removes it |

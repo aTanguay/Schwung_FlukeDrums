@@ -19,6 +19,8 @@ static const mrdrums_param_desc_t kGlobalParams[] = {
     {"rr_pool_dir", "Browse", "filepath", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "/data/UserData/UserLibrary/Samples", NULL, "/data", "[\".wav\",\".aif\",\".aiff\"]", "/data/UserData/UserLibrary/Samples"},
     {"rr_recursive", "Subfolders", "enum", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "on", "[\"off\",\"on\"]", NULL, NULL, NULL},
     {"rr_max_len", "Max Len", "float", NULL, 0, 0.0f, 10.0f, 0.1f, 2.0f, NULL, NULL, NULL, NULL, NULL},
+    /* FlukeDrums: pads 1-8 follow a kit (kick, snare, hats...) found by sample name. */
+    {"rr_kit_mode", "Kit Mode", "enum", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "on", "[\"off\",\"on\"]", NULL, NULL, NULL},
 };
 
 static const mrdrums_pad_field_desc_t kPadFields[] = {

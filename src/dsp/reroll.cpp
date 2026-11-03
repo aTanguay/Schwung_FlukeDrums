@@ -12,6 +12,7 @@
 #include <vector>
 #include <array>
 
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <dirent.h>
@@ -74,7 +75,8 @@ enum CmdType {
     CMD_COMMIT,
     CMD_FOLDER_ROOT,
     CMD_SCAN_FOLDERS,
-    CMD_JOB
+    CMD_JOB,
+    CMD_KIT_MODE
 };
 
 struct Cmd {
@@ -117,6 +119,8 @@ struct rr_ctx {
 
     std::atomic<int> status{RR_ST_NO_POOL};
     std::atomic<int> pool_count{0};
+    /* files per role after the last scan; zeroed by new rr_ctx() */
+    std::atomic<int> role_counts[RR_ROLE_COUNT];
     std::atomic<int> undo_depth{0};
     std::atomic<int> pending{0};
 
@@ -134,8 +138,11 @@ struct rr_ctx {
     /* ---- worker-only state below ---- */
     std::vector<FolderRoot> roots;
     std::vector<std::string> pool;
+    std::vector<uint8_t> pool_role;                /* parallel to pool */
+    std::vector<uint32_t> by_role[RR_ROLE_COUNT];  /* pool indices per role */
     std::string pool_dir;
     bool recursive = true;
+    bool kit_mode = true;
     float max_len = 2.0f;
     Snapshot cur;
     std::vector<UndoStep> undo;
@@ -150,6 +157,15 @@ static void sleep_ms(int ms) {
     ts.tv_sec = ms / 1000;
     ts.tv_nsec = (long)(ms % 1000) * 1000000L;
     nanosleep(&ts, NULL);
+}
+
+static size_t gcd_size(size_t a, size_t b) {
+    while (b) {
+        const size_t t = a % b;
+        a = b;
+        b = t;
+    }
+    return a;
 }
 
 static uint64_t rng_next(rr_ctx *c) {
@@ -182,6 +198,171 @@ static const char *base_name(const char *path) {
     const char *slash = strrchr(path, '/');
     return slash ? slash + 1 : path;
 }
+
+/* ------------------------------------------------------------------------- */
+/* Kit roles: what a sample is, guessed from its name                        */
+/* ------------------------------------------------------------------------- */
+/* Names are split into WORDS, never searched as raw text: "808BD_01" is
+ * [808, bd, 01] and "KickHard" is [kick, hard], so "bd" matches those but not
+ * "ABDUCT". Each pair of neighbouring words is also tried joined, so "Hi Hat"
+ * and "HiHat" both reach "hihat". */
+enum { kMaxWords = 24, kWordLen = 32 };
+
+/* Fixed buffers, no allocation: this runs for every file in a scan. Words
+ * past kMaxWords are ignored and long words are cut to kWordLen - 1 (no role
+ * word is longer than 10 letters, so a cut word can't fake a match). */
+struct NameWords {
+    int n;
+    char w[kMaxWords][kWordLen];
+};
+
+static void name_words(const char *s, size_t len, NameWords *out) {
+    out->n = 0;
+    char cur[kWordLen];
+    size_t cl = 0;
+    auto flush = [&]() {
+        if (cl && out->n < kMaxWords) {
+            memcpy(out->w[out->n], cur, cl);
+            out->w[out->n][cl] = '\0';
+            out->n++;
+        }
+        cl = 0;
+    };
+    for (size_t i = 0; i < len; i++) {
+        const unsigned char ch = (unsigned char)s[i];
+        if (!isalnum(ch)) {
+            flush();
+            continue;
+        }
+        if (cl) {
+            const unsigned char prev = (unsigned char)s[i - 1];
+            const bool split = (!!isdigit(ch) != !!isdigit(prev)) ||               /* 808|BD   */
+                               (isupper(ch) && islower(prev)) ||                     /* Kick|Hard */
+                               (isupper(ch) && isupper(prev) && i + 1 < len &&
+                                islower((unsigned char)s[i + 1]));                   /* HH|Open  */
+            if (split) flush();
+        }
+        if (cl < kWordLen - 1) cur[cl++] = (char)tolower(ch);
+    }
+    flush();
+}
+
+struct RoleWord {
+    const char *word;
+    int role;
+};
+
+/* The common names and abbreviations sample packs use. Plurals ("kicks",
+ * "hats") are handled by lookup_word, not listed. */
+static const RoleWord kRoleWords[] = {
+    {"kick", RR_ROLE_KICK}, {"kik", RR_ROLE_KICK}, {"kck", RR_ROLE_KICK}, {"bd", RR_ROLE_KICK},
+    {"bassdrum", RR_ROLE_KICK}, {"kickdrum", RR_ROLE_KICK},
+    {"snare", RR_ROLE_SNARE}, {"snr", RR_ROLE_SNARE}, {"sn", RR_ROLE_SNARE}, {"sd", RR_ROLE_SNARE},
+    {"snaredrum", RR_ROLE_SNARE},
+    {"clap", RR_ROLE_CLAP}, {"clp", RR_ROLE_CLAP}, {"cp", RR_ROLE_CLAP}, {"handclap", RR_ROLE_CLAP},
+    {"hihat", RR_ROLE_HAT_CLOSED}, {"highhat", RR_ROLE_HAT_CLOSED}, {"hat", RR_ROLE_HAT_CLOSED},
+    {"hh", RR_ROLE_HAT_CLOSED}, {"chh", RR_ROLE_HAT_CLOSED}, {"ch", RR_ROLE_HAT_CLOSED},
+    {"hhc", RR_ROLE_HAT_CLOSED}, {"closedhat", RR_ROLE_HAT_CLOSED},
+    {"ohh", RR_ROLE_HAT_OPEN}, {"oh", RR_ROLE_HAT_OPEN}, {"hho", RR_ROLE_HAT_OPEN},
+    {"openhat", RR_ROLE_HAT_OPEN}, {"openhh", RR_ROLE_HAT_OPEN},
+    {"crash", RR_ROLE_CRASH}, {"crashes", RR_ROLE_CRASH}, {"crsh", RR_ROLE_CRASH},
+    {"cymbal", RR_ROLE_CRASH}, {"cym", RR_ROLE_CRASH}, {"cy", RR_ROLE_CRASH},
+    {"splash", RR_ROLE_CRASH}, {"china", RR_ROLE_CRASH},
+    {"ride", RR_ROLE_RIDE}, {"rd", RR_ROLE_RIDE},
+    {"tom", RR_ROLE_TOM}, {"tm", RR_ROLE_TOM}, {"lt", RR_ROLE_TOM}, {"mt", RR_ROLE_TOM},
+    {"ht", RR_ROLE_TOM}, {"ft", RR_ROLE_TOM}, {"floortom", RR_ROLE_TOM}, {"lowtom", RR_ROLE_TOM},
+    {"midtom", RR_ROLE_TOM}, {"hitom", RR_ROLE_TOM}, {"hightom", RR_ROLE_TOM},
+    {"perc", RR_ROLE_PERC}, {"prc", RR_ROLE_PERC}, {"percussion", RR_ROLE_PERC},
+    {"rim", RR_ROLE_PERC}, {"rimshot", RR_ROLE_PERC}, {"rs", RR_ROLE_PERC},
+    {"sidestick", RR_ROLE_PERC}, {"stick", RR_ROLE_PERC}, {"cowbell", RR_ROLE_PERC},
+    {"cb", RR_ROLE_PERC}, {"conga", RR_ROLE_PERC}, {"bongo", RR_ROLE_PERC},
+    {"shaker", RR_ROLE_PERC}, {"shk", RR_ROLE_PERC}, {"tamb", RR_ROLE_PERC},
+    {"tambourine", RR_ROLE_PERC}, {"clave", RR_ROLE_PERC}, {"woodblock", RR_ROLE_PERC},
+    {"block", RR_ROLE_PERC}, {"snap", RR_ROLE_PERC}, {"fingersnap", RR_ROLE_PERC},
+    {"guiro", RR_ROLE_PERC}, {"cabasa", RR_ROLE_PERC}, {"triangle", RR_ROLE_PERC},
+    {"agogo", RR_ROLE_PERC}, {"timbale", RR_ROLE_PERC},
+};
+
+/* Words that mean "not a drum hit": a loop or phrase, or a voice (so a
+ * vocal "Oh Yeah" isn't taken for an open hat, "OH"). */
+static const char *const kNotAHitWords[] = {
+    "loop", "break", "breakbeat", "fill", "groove", "beat", "bpm", "pattern", "phrase",
+    "vocal", "vox", "voice", "chant",
+};
+
+static int find_role_word(const char *w) {
+    for (const RoleWord &rw : kRoleWords) {
+        if (strcmp(w, rw.word) == 0) return rw.role;
+    }
+    return RR_ROLE_NONE;
+}
+
+static bool is_plural(const char *w, size_t n) {
+    return n > 3 && w[n - 1] == 's' && w[n - 2] != 's'; /* "kicks", not "bass" */
+}
+
+static int lookup_word(const char *w) {
+    int r = find_role_word(w);
+    const size_t n = strlen(w);
+    if (!r && is_plural(w, n)) {
+        char single[2 * kWordLen];
+        memcpy(single, w, n - 1);
+        single[n - 1] = '\0';
+        r = find_role_word(single);
+    }
+    return r;
+}
+
+static bool not_a_hit_word(const char *w) {
+    const size_t n = strlen(w);
+    for (const char *nw : kNotAHitWords) {
+        if (strcmp(w, nw) == 0) return true;
+        if (is_plural(w, n) && strlen(nw) == n - 1 && strncmp(w, nw, n - 1) == 0) return true;
+    }
+    return false;
+}
+
+/* Role of one name (a file stem or one folder): a role, NONE, or -1 for
+ * "not a drum hit", which overrides any role word in it. *saw_open is set if
+ * the name says "open" (and *saw_closed for "closed"), so an "open" folder
+ * can turn a plain hat into an open hat, unless something says "closed". */
+static int role_of_name(const char *s, size_t len, bool *saw_open, bool *saw_closed) {
+    NameWords nw;
+    name_words(s, len, &nw);
+    bool have[RR_ROLE_COUNT] = {false};
+    bool open = false;
+    for (int i = 0; i < nw.n; i++) {
+        const char *w = nw.w[i];
+        if (not_a_hit_word(w)) return -1;
+        if (strcmp(w, "open") == 0 || strcmp(w, "opn") == 0) open = true;
+        if (strcmp(w, "closed") == 0 || strcmp(w, "close") == 0) *saw_closed = true;
+        have[lookup_word(w)] = true;
+        if (i + 1 < nw.n) {
+            char pair[2 * kWordLen];               /* each word < kWordLen: always fits */
+            const size_t a = strlen(w), b = strlen(nw.w[i + 1]);
+            memcpy(pair, w, a);
+            memcpy(pair + a, nw.w[i + 1], b + 1);
+            have[lookup_word(pair)] = true;
+        }
+    }
+    if (open) *saw_open = true;
+    if (have[RR_ROLE_HAT_CLOSED] && open && !*saw_closed) have[RR_ROLE_HAT_OPEN] = true;
+    /* Several role words ("Snare Rim", "Open Hat")? The more specific drum wins. */
+    static const int kPriority[] = {RR_ROLE_KICK, RR_ROLE_SNARE, RR_ROLE_CLAP, RR_ROLE_HAT_OPEN,
+                                    RR_ROLE_HAT_CLOSED, RR_ROLE_TOM, RR_ROLE_CRASH, RR_ROLE_RIDE,
+                                    RR_ROLE_PERC};
+    for (int r : kPriority) {
+        if (have[r]) return r;
+    }
+    return RR_ROLE_NONE;
+}
+
+/* Kit Mode layout: bottom row kick, kick, snare, clap; second row closed hat,
+ * open hat, cymbal, tom. Rows 3-4 stay random. */
+static const int kKitTemplate[RR_KIT_SLOTS] = {
+    RR_ROLE_KICK, RR_ROLE_KICK, RR_ROLE_SNARE, RR_ROLE_CLAP,
+    RR_ROLE_HAT_CLOSED, RR_ROLE_HAT_OPEN, RR_ROLE_CRASH, RR_ROLE_TOM,
+};
 
 static bool mkdir_p(const std::string &dir) {
     std::string partial;
@@ -306,6 +487,7 @@ static void walk(rr_ctx *c, const std::string &dir, int depth) {
             if (c->recursive && depth < kMaxDepth) walk(c, full, depth + 1);
         } else if (is_reg && is_audio_file(e->d_name)) {
             c->pool.push_back(full);
+            c->pool_role.push_back((uint8_t)rr_classify(full.c_str()));
             if (c->pool.size() >= kPoolCap) break;
         }
     }
@@ -316,7 +498,22 @@ static void scan_pool(rr_ctx *c) {
     c->status.store(RR_ST_SCANNING);
     c->pool.clear();
     c->pool.shrink_to_fit();
+    c->pool_role.clear();
+    c->pool_role.shrink_to_fit();
+    for (std::vector<uint32_t> &v : c->by_role) {
+        v.clear();
+        v.shrink_to_fit();
+    }
     if (!c->pool_dir.empty()) walk(c, c->pool_dir, 0);
+    for (size_t i = 0; i < c->pool_role.size(); i++) {
+        if (c->pool_role[i]) c->by_role[c->pool_role[i]].push_back((uint32_t)i);
+    }
+    size_t classified = 0;
+    for (int r = 1; r < RR_ROLE_COUNT; r++) {
+        c->role_counts[r].store((int)c->by_role[r].size());
+        classified += c->by_role[r].size();
+    }
+    c->role_counts[RR_ROLE_NONE].store((int)(c->pool.size() - classified)); /* no index kept for these */
     c->pool_count.store((int)c->pool.size());
     c->status.store(c->pool.empty() ? RR_ST_NO_POOL : RR_ST_IDLE);
 }
@@ -509,32 +706,69 @@ static void do_roll(rr_ctx *c, uint32_t mask) {
     const Snapshot before = c->cur;
 
     const size_t n = c->pool.size();
-    std::vector<size_t> used;
-    used.reserve(RR_PADS);
     bool changed = false;
+
+    /* Already somewhere in the kit: this pad, a pad rolled earlier in this
+     * roll, or a locked pad. */
+    auto in_kit = [c](const std::string &path) {
+        for (const std::string &p : c->cur) {
+            if (p == path) return true;
+        }
+        return false;
+    };
+    /* Decode and swap in one candidate; false if it doesn't fit (Max Len, bad file). */
+    auto try_land = [&](int pad, const std::string &path) {
+        rr_buffer_t buf;
+        if (!load_one(c, path, true, &buf)) return false;
+        c->cur[pad - 1] = path;
+        push_ready(c, pad, buf, path);
+        changed = true;
+        return true;
+    };
 
     for (int pad = 1; pad <= RR_PADS; pad++) {
         if (!(mask & (1u << (pad - 1)))) continue;
         if (c->stop.load(std::memory_order_relaxed)) break;
+        bool landed = false;
+
+        /* Kit Mode: try the pad's role, then its fallback (snare <-> clap,
+         * ...), fresh files only. Nothing usable falls through to random.
+         * The list is walked in a shuffled order (random start, random step
+         * coprime to its size) so every file is reachable without allocating:
+         * a role with one fresh file left always finds it. */
+        const int role = c->kit_mode ? rr_kit_role(pad) : RR_ROLE_NONE;
+        const int chain[2] = {role, role ? rr_role_fallback(role) : RR_ROLE_NONE};
+        for (int k = 0; k < 2 && !landed; k++) {
+            if (!chain[k]) continue;
+            const std::vector<uint32_t> &list = c->by_role[chain[k]];
+            const size_t m = list.size();
+            if (!m) continue;
+            size_t step = 1;
+            for (int t = 0; t < 8 && m > 2; t++) {
+                const size_t s = 1 + (size_t)(rng_next(c) % (m - 1));
+                if (gcd_size(s, m) == 1) {
+                    step = s;
+                    break;
+                }
+            }
+            const int kRoleLoads = 16;   /* decode attempts, not candidates looked at */
+            int loads = 0;
+            size_t at = (size_t)(rng_next(c) % m);
+            for (size_t j = 0; j < m && loads < kRoleLoads && !landed; j++, at = (at + step) % m) {
+                const std::string &path = c->pool[list[at]];
+                if (in_kit(path)) continue;
+                loads++;
+                landed = try_land(pad, path);
+            }
+        }
 
         const int kAttempts = 24;
-        for (int attempt = 0; attempt < kAttempts; attempt++) {
-            size_t idx = (size_t)(rng_next(c) % n);
-            const std::string &path = c->pool[idx];
-            /* Prefer a fresh file that isn't already on this pad or elsewhere in
-             * this roll; relax that once a small pool makes it impossible. */
-            if (attempt < kAttempts / 2 && n > 1) {
-                bool dup = path == c->cur[pad - 1];
-                for (size_t u : used) dup = dup || u == idx;
-                if (dup) continue;
-            }
-            rr_buffer_t buf;
-            if (!load_one(c, path, true, &buf)) continue;
-            used.push_back(idx);
-            c->cur[pad - 1] = path;
-            push_ready(c, pad, buf, path);
-            changed = true;
-            break;
+        for (int attempt = 0; attempt < kAttempts && !landed; attempt++) {
+            const std::string &path = c->pool[(size_t)(rng_next(c) % n)];
+            /* Prefer a file that isn't in the kit yet; relax that once a small
+             * pool makes it impossible. */
+            if (attempt < kAttempts / 2 && n > 1 && in_kit(path)) continue;
+            landed = try_land(pad, path);
         }
     }
 
@@ -630,6 +864,8 @@ static void do_commit(rr_ctx *c) {
         first = false;
         manifest += "{\"pad\": " + std::to_string(pad) + ", \"file\": \"";
         json_escape_into(manifest, fname);
+        manifest += "\", \"kind\": \"";
+        json_escape_into(manifest, rr_role_name(rr_classify(src.c_str())));
         manifest += "\", \"source\": \"";
         json_escape_into(manifest, src);
         manifest += "\"}";
@@ -688,6 +924,9 @@ static bool handle(rr_ctx *c, const Cmd &cmd) {
         break;
     case CMD_MAX_LEN:
         c->max_len = cmd.f;
+        break;
+    case CMD_KIT_MODE:
+        c->kit_mode = cmd.flag != 0;
         break;
     case CMD_ROLL:
         do_roll(c, cmd.mask);
@@ -835,6 +1074,79 @@ int rr_set_max_len(rr_ctx_t *c, float seconds) {
     Cmd cmd = make_cmd(CMD_MAX_LEN);
     cmd.f = seconds;
     return enqueue(c, cmd);
+}
+
+int rr_set_kit_mode(rr_ctx_t *c, int on) {
+    Cmd cmd = make_cmd(CMD_KIT_MODE);
+    cmd.flag = on ? 1 : 0;
+    return enqueue(c, cmd);
+}
+
+int rr_role_count(const rr_ctx_t *c, int role) {
+    if (!c || role < 0 || role >= RR_ROLE_COUNT) return 0;
+    return c->role_counts[role].load(std::memory_order_relaxed);
+}
+
+int rr_kit_role(int pad) {
+    return (pad >= 1 && pad <= RR_KIT_SLOTS) ? kKitTemplate[pad - 1] : RR_ROLE_NONE;
+}
+
+int rr_role_fallback(int role) {
+    switch (role) {
+    case RR_ROLE_SNARE: return RR_ROLE_CLAP;
+    case RR_ROLE_CLAP: return RR_ROLE_SNARE;
+    case RR_ROLE_HAT_CLOSED: return RR_ROLE_HAT_OPEN;
+    case RR_ROLE_HAT_OPEN: return RR_ROLE_HAT_CLOSED;
+    case RR_ROLE_CRASH: return RR_ROLE_RIDE;
+    case RR_ROLE_RIDE: return RR_ROLE_CRASH;
+    case RR_ROLE_TOM: return RR_ROLE_PERC;
+    default: return RR_ROLE_NONE;
+    }
+}
+
+const char *rr_role_name(int role) {
+    switch (role) {
+    case RR_ROLE_KICK: return "kick";
+    case RR_ROLE_SNARE: return "snare";
+    case RR_ROLE_CLAP: return "clap";
+    case RR_ROLE_HAT_CLOSED: return "closed hat";
+    case RR_ROLE_HAT_OPEN: return "open hat";
+    case RR_ROLE_CRASH: return "crash";
+    case RR_ROLE_RIDE: return "ride";
+    case RR_ROLE_TOM: return "tom";
+    case RR_ROLE_PERC: return "perc";
+    default: return "other";
+    }
+}
+
+/* The file's own name decides first. If it says nothing, its folder does,
+ * then the folder above ("Kicks/Acoustic/wood.wav" is a kick). A loop-ish
+ * name in the file or its folder means "not a hit", whatever else it says. */
+int rr_classify(const char *path) {
+    if (!path || !path[0]) return RR_ROLE_NONE;
+    const char *slash = strrchr(path, '/');
+    const char *name = slash ? slash + 1 : path;
+    const char *dot = strrchr(name, '.');
+    bool open = false, closed = false;
+    int r = role_of_name(name, dot ? (size_t)(dot - name) : strlen(name), &open, &closed);
+    if (r < 0) return RR_ROLE_NONE;
+
+    const char *seg_end = slash;
+    for (int level = 0; level < 2 && seg_end && seg_end > path; level++) {
+        const char *seg = seg_end;
+        while (seg > path && seg[-1] != '/') seg--;
+        const int fr = role_of_name(seg, (size_t)(seg_end - seg), &open, &closed);
+        if (fr < 0) {
+            if (level == 0) return RR_ROLE_NONE;            /* a loop folder vetoes */
+            break;
+        }
+        if (r) break;                                      /* the name already said */
+        r = fr;
+        if (r || seg == path) break;
+        seg_end = seg - 1;
+    }
+    if (r == RR_ROLE_HAT_CLOSED && open && !closed) r = RR_ROLE_HAT_OPEN; /* "Hats/Open/1.wav" */
+    return r;
 }
 
 int rr_roll(rr_ctx_t *c, uint32_t pad_mask) {

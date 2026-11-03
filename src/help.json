@@ -80,6 +80,27 @@
       ]
     },
     {
+      "title": "Kit Mode",
+      "lines": [
+        "Pool page, knob 1.",
+        "On: pads 1-8 build",
+        "  a real kit, found",
+        "  by sample names:",
+        "1-2 kick 3 snare",
+        "4 clap 5 closed hat",
+        "6 open hat",
+        "7 crash/ride 8 tom",
+        "9-16: wild cards.",
+        "No match: random.",
+        "Kit Parts: how many",
+        "  of the 8 found a",
+        "  match (x/8).",
+        "Roll Pad keeps the",
+        "  pad's part.",
+        "Off: all random."
+      ]
+    },
+    {
       "title": "Roll Tips",
       "lines": [
         "Auto Select on: the",

@@ -425,6 +425,104 @@ int main() {
     }
     CHECK(trunc_ok, "long folder label not truncated as '...tail (n)'");
 
+    /* ---- Kit roles: names -> parts ---- */
+    {
+        struct { const char *path; int role; } names[] = {
+            {"/s/808BD_01.wav", RR_ROLE_KICK},        {"/s/KickHard.wav", RR_ROLE_KICK},
+            {"/s/Kicks/Thump.wav", RR_ROLE_KICK},     {"/s/BD.wav", RR_ROLE_KICK},
+            {"/data/CoreLibrary/Samples/Drums/Kick/Kick Charred.wav", RR_ROLE_KICK},
+            {"/s/TR909_SD3.wav", RR_ROLE_SNARE},      {"/s/Snare Rim.wav", RR_ROLE_SNARE},
+            {"/s/Snares/Acoustic/Wood.wav", RR_ROLE_SNARE},
+            {"/s/Clap Big.wav", RR_ROLE_CLAP},
+            {"/s/CH_01.wav", RR_ROLE_HAT_CLOSED},     {"/s/Hi Hat Closed 3.wav", RR_ROLE_HAT_CLOSED},
+            {"/s/Hats/Closed/x.wav", RR_ROLE_HAT_CLOSED}, {"/s/Hats Open/Closed Hat.wav", RR_ROLE_HAT_CLOSED},
+            {"/s/HiHat_Open.wav", RR_ROLE_HAT_OPEN},  {"/s/HHOpen.wav", RR_ROLE_HAT_OPEN},
+            {"/s/OH 02.aif", RR_ROLE_HAT_OPEN},       {"/s/hihats/open/o1.wav", RR_ROLE_HAT_OPEN},
+            {"/s/Crash 18in.wav", RR_ROLE_CRASH},     {"/s/cymbals/c1.wav", RR_ROLE_CRASH},
+            {"/s/Ride Bell.wav", RR_ROLE_RIDE},
+            {"/s/Tom Low.wav", RR_ROLE_TOM},          {"/s/LT 808.wav", RR_ROLE_TOM},
+            {"/s/Rimshot.wav", RR_ROLE_PERC},         {"/s/Cowbell.wav", RR_ROLE_PERC},
+            {"/s/Percussion/Shaker 2.wav", RR_ROLE_PERC},
+            /* not hits, or not drums */
+            {"/s/Kick Loop 120bpm.wav", RR_ROLE_NONE}, {"/s/Loops/Kick 1.wav", RR_ROLE_NONE},
+            {"/s/Fills/Tom Fill.wav", RR_ROLE_NONE},  {"/s/Vocals/Oh Yeah.wav", RR_ROLE_NONE},
+            {"/s/Bass 808.wav", RR_ROLE_NONE},        {"/s/ABDUCT.wav", RR_ROLE_NONE},
+            {"/s/Synth Pad.wav", RR_ROLE_NONE},       {"", RR_ROLE_NONE},
+        };
+        for (auto &n : names) {
+            int got = rr_classify(n.path);
+            CHECK(got == n.role, "classify %s: got %s want %s", n.path, rr_role_name(got), rr_role_name(n.role));
+        }
+        CHECK(rr_classify(nullptr) == RR_ROLE_NONE, "classify NULL");
+        CHECK(rr_kit_role(1) == RR_ROLE_KICK && rr_kit_role(8) == RR_ROLE_TOM && rr_kit_role(9) == RR_ROLE_NONE &&
+              rr_kit_role(0) == RR_ROLE_NONE, "kit template");
+    }
+
+    /* ---- Kit Mode rolls: a real kit on pads 1-8, fallbacks, random 9-16 ---- */
+    {
+        const std::string kp = root + "/kitpool";
+        mkdirs(kp);
+        for (int i = 1; i <= 3; i++) write_fake(kp + "/BD " + std::to_string(i) + ".wav", 300);
+        for (int i = 1; i <= 3; i++) write_fake(kp + "/Snare " + std::to_string(i) + ".wav", 300);
+        for (int i = 1; i <= 4; i++) write_fake(kp + "/HH " + std::to_string(i) + ".wav", 300);
+        write_fake(kp + "/OHH 1.wav", 300);
+        for (int i = 1; i <= 2; i++) write_fake(kp + "/Conga " + std::to_string(i) + ".wav", 300);
+        for (int i = 0; i < 20; i++) write_fake(kp + "/tone " + std::to_string(i) + ".wav", 300);
+        /* no claps, cymbals or toms: those slots must use their fallbacks */
+
+        rr_ctx_t *c3 = rr_create(fake_loader, commit_root.c_str());
+        rr_set_max_len(c3, 2.0f);
+        rr_set_pool(c3, kp.c_str(), 1);
+        settle(c3);
+        CHECK(rr_role_count(c3, RR_ROLE_KICK) == 3 && rr_role_count(c3, RR_ROLE_SNARE) == 3 &&
+              rr_role_count(c3, RR_ROLE_HAT_CLOSED) == 4 && rr_role_count(c3, RR_ROLE_HAT_OPEN) == 1 &&
+              rr_role_count(c3, RR_ROLE_PERC) == 2 && rr_role_count(c3, RR_ROLE_CLAP) == 0 &&
+              rr_role_count(c3, RR_ROLE_NONE) == 20, "role counts after scan");
+
+        rr_roll(c3, 0xFFFF);
+        settle(c3);
+        auto k = paths();
+        auto role = [&](int pad) { return rr_classify(k[pad - 1].c_str()); };
+        CHECK(role(1) == RR_ROLE_KICK && role(2) == RR_ROLE_KICK, "pads 1-2 not kicks: %s %s", k[0].c_str(), k[1].c_str());
+        CHECK(role(3) == RR_ROLE_SNARE, "pad 3 not a snare: %s", k[2].c_str());
+        CHECK(role(4) == RR_ROLE_SNARE, "pad 4 (no claps) should fall back to a snare: %s", k[3].c_str());
+        CHECK(role(5) == RR_ROLE_HAT_CLOSED, "pad 5 not a closed hat: %s", k[4].c_str());
+        CHECK(role(6) == RR_ROLE_HAT_OPEN, "pad 6 not the open hat: %s", k[5].c_str());
+        CHECK(!k[6].empty(), "pad 7 (no cymbals at all) should still get a random sample");
+        CHECK(role(8) == RR_ROLE_PERC, "pad 8 (no toms) should fall back to perc: %s", k[7].c_str());
+        std::set<std::string> uk(k.begin(), k.end());
+        CHECK(uk.size() == 16 && !uk.count(""), "kit roll should fill 16 distinct pads (%zu)", uk.size());
+
+        /* Roll Pad keeps the pad's part, and never repeats a sample in the kit.
+         * Empty every randomly rolled pad first (7, which has no cymbals to
+         * use, and 9-16), so none can be holding the last fresh snare or hat. */
+        for (int p = 7; p <= 16; p++)
+            if (p != 8) rr_load(c3, p, "", 0);
+        settle(c3);
+        rr_roll(c3, 1u << 2);
+        settle(c3);
+        auto k2 = paths();
+        CHECK(rr_classify(k2[2].c_str()) == RR_ROLE_SNARE && k2[2] != k[2] && k2[2] != k[3],
+              "Roll Pad 3: %s (was %s, pad 4 %s)", k2[2].c_str(), k[2].c_str(), k[3].c_str());
+        /* the only open hat is already on pad 6, so its fallback (closed hat) is used */
+        rr_roll(c3, 1u << 5);
+        settle(c3);
+        auto k3 = paths();
+        CHECK(rr_classify(k3[5].c_str()) == RR_ROLE_HAT_CLOSED && k3[5] != k3[4],
+              "Roll Pad 6 should fall back to a fresh closed hat: %s", k3[5].c_str());
+
+        /* Kit Mode off: pad 1 is no longer always a kick */
+        rr_set_kit_mode(c3, 0);
+        int non_kick = 0;
+        for (int i = 0; i < 10; i++) {
+            rr_roll(c3, 1u << 0);
+            settle(c3);
+            non_kick += rr_classify(paths()[0].c_str()) != RR_ROLE_KICK;
+        }
+        CHECK(non_kick > 0, "kit mode off still always rolled a kick on pad 1");
+        rr_destroy(c3);
+    }
+
     /* Shutdown with work in flight: nothing may leak (LSan) or hang */
     rr_set_pool(c, pool.c_str(), 1);
     for (int k = 0; k < 20; k++) rr_roll(c, 0xFFFF);
