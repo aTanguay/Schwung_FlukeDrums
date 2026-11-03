@@ -61,28 +61,64 @@ Either way works:
 
 The store is driven by
 [`module-catalog.json`](https://github.com/charlesvestal/schwung/blob/main/module-catalog.json)
-in the Schwung repo. Open a pull request there that adds an entry like this:
+in the Schwung repo, served live from its `main` branch. Getting listed is a
+one-time pull request that appends this entry to the end of the `modules`
+array:
 
 ```json
-{
-  "id": "flukedrums",
-  "name": "FlukeDrums",
-  "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit",
-  "author": "Andy Tanguay (engine: MrDrums by handcraftedcc)",
-  "component_type": "sound_generator",
-  "subcategory": "drum-machine",
-  "tags": ["sample-based", "drums", "generative"],
-  "github_repo": "aTanguay/Schwung_FlukeDrums",
-  "default_branch": "main",
-  "asset_name": "flukedrums-module.tar.gz",
-  "min_host_version": "1.0.0"
-}
+    {
+      "id": "flukedrums",
+      "name": "FlukeDrums",
+      "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit",
+      "author": "Andy Tanguay",
+      "component_type": "sound_generator",
+      "subcategory": "drum-machine",
+      "tags": ["generative", "sample-based"],
+      "github_repo": "aTanguay/Schwung_FlukeDrums",
+      "default_branch": "main",
+      "asset_name": "flukedrums-module.tar.gz",
+      "min_host_version": "1.0.0"
+    }
 ```
+
+Schwung's CI validates every entry against `taxonomy.json`
+(`tools/catalog/taxonomy.mjs`):
+
+- `subcategory` must be one of the component type's ids. `drum-machine` is right.
+- `tags` must come from the vocabulary, **sorted**, with no duplicates.
+- **Don't add `drums`.** The `drum-machine` subcategory already implies it, and
+  repeating an implied tag is an error.
+- `needs-assets` is only allowed when a `requires` field says why. FlukeDrums
+  works with Ableton's built-in library, so it has neither.
+- `min_host_version`: 1.0.0 is the first Schwung with `access: "read"/"write"`
+  (the readouts and the Roll / Undo / Save triggers). It's in the docs and code
+  at v1.0.0 and absent at v0.12.1.
+
+**After the first listing, releases need no PR.** Schwung Manager reads
+`release.json` from this repo's `main`, so tagging `vX.Y.Z` (see section 2) is
+all it takes. Only edit the catalog entry again to change the description,
+tags or `min_host_version`.
+
+### Opening the pull request (in the browser)
+
+1. Open `module-catalog.json` on GitHub (link above) and click the pencil
+   (**Edit**). GitHub offers to fork the repo for you; accept.
+2. Go to the end of the `modules` array: after the last entry's closing `}`,
+   add a comma, then paste the entry above. Commas are the usual mistake;
+   GitHub's editor shows red marks if the JSON breaks.
+3. **Commit changes… → Propose changes**, then **Create pull request**.
+4. In the description, say what it is, link this repo, mention it's built on
+   MrDrums, and **disclose the AI tools used (Claude)**, as Schwung's
+   CONTRIBUTING.md asks.
+5. Since this is your first contribution, Charles has to click
+   **Approve and run** before CI runs. Once the checks are green he merges, and
+   FlukeDrums shows up in Schwung Manager straight away.
 
 Before submitting:
 
-- [ ] Confirm `min_host_version` on the oldest Schwung you can test (see
-      TASKS.md)
+- [ ] Check that `release.json` on `main` points at a release that exists,
+      with `flukedrums-module.tar.gz` attached (that's what the manager
+      downloads)
 - [ ] Read Schwung's
       [CONTRIBUTING.md](https://github.com/charlesvestal/schwung/blob/main/CONTRIBUTING.md).
       It asks you to disclose AI tools used (Claude) and does not accept
