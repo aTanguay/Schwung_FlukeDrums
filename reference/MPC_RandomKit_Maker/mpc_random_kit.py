@@ -1,19 +1,34 @@
-"""Core kit-building logic for MPC RandoKitter.
+#!/usr/bin/env python3
+"""
+mpc_random_kit.py
+-----------------
+Randomly picks samples from a directory tree and generates a valid
+Akai MPC .xpm Drum Program file (format version 2.1).
 
-Shared by the CLI (mpc_random_kit.py) and the GUI (mpc_randokitter/gui.py).
-Zero third-party dependencies — Python 3.6+ stdlib only.
+Usage:
+    python3 mpc_random_kit.py [source_dir] [--name "My Kit"] [--count 64] [--seed 42] [--kits 5]
+
+    If source_dir is omitted, the script scans the directory it lives in.
+    If --kits is omitted, the script asks interactively (1-10).
+    Output is a self-contained folder per kit with the .xpm and copied samples.
+
+Requirements: Python 3.6+ standard library only (no pip installs needed).
 """
 
-import datetime
 import io
 import os
-import random
 import re
+import sys
+import random
 import shutil
-import threading
+import argparse
+import datetime
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Callable, List, Optional
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 
 AUDIO_EXTENSIONS = {".wav", ".aif", ".aiff"}
 
@@ -88,16 +103,17 @@ def default_pad_notes(count=128):
 
 CACHE_FILENAME = "mpc_random_kit.cache"
 
+def _cache_path():
+    """Return the absolute path to the cache file (next to this script)."""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), CACHE_FILENAME)
+
 def load_cache(source_dir):
     """Try to load sample paths from the cache file.
 
     Returns a list of paths if the cache is fresh (created today, same source
     directory). Returns None if the cache is missing, stale, or corrupt.
-
-    The cache file lives inside the source directory so it travels with the
-    sample library.
     """
-    cp = os.path.join(os.path.abspath(source_dir), CACHE_FILENAME)
+    cp = _cache_path()
     try:
         with open(cp, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
@@ -125,11 +141,8 @@ def load_cache(source_dir):
     return samples if samples else None
 
 def write_cache(source_dir, samples):
-    """Write sample paths to the cache file with metadata header.
-
-    The cache file lives inside the source directory.
-    """
-    cp = os.path.join(os.path.abspath(source_dir), CACHE_FILENAME)
+    """Write sample paths to the cache file with metadata header."""
+    cp = _cache_path()
     today = datetime.date.today().isoformat()
     try:
         with open(cp, "w", encoding="utf-8") as f:
@@ -145,12 +158,12 @@ def write_cache(source_dir, samples):
 # Sample discovery
 # ---------------------------------------------------------------------------
 
-def find_samples(root_dir, skip_dirs=None, progress_cb: Optional[Callable[[int], None]] = None):
+def find_samples(root_dir, skip_dirs=None):
     """Recursively find all audio files under root_dir using os.scandir().
 
-    Prints a running count (or calls progress_cb if supplied) so the caller
-    knows scanning is progressing. Skips directories in skip_dirs (absolute
-    paths) to avoid picking up previously generated kits.
+    Prints a running count so the user knows scanning is progressing.
+    Skips directories in skip_dirs (absolute paths) to avoid picking up
+    previously generated kits.
     """
     samples = []
     last_count = [0]
@@ -159,10 +172,7 @@ def find_samples(root_dir, skip_dirs=None, progress_cb: Optional[Callable[[int],
     def _print_progress():
         count = len(samples)
         if count - last_count[0] >= 500 or count == 0:
-            if progress_cb:
-                progress_cb(count)
-            else:
-                print(f"\r  Scanning... found {count:,} samples so far", end="", flush=True)
+            print(f"\r  Scanning... found {count:,} samples so far", end="", flush=True)
             last_count[0] = count
 
     def _walk(path):
@@ -184,9 +194,8 @@ def find_samples(root_dir, skip_dirs=None, progress_cb: Optional[Callable[[int],
             pass
 
     _walk(root_dir)
-    # Clear the progress line (only in CLI mode)
-    if progress_cb is None:
-        print(f"\r  Found {len(samples):,} samples.{' ' * 20}")
+    # Clear the progress line
+    print(f"\r  Found {len(samples):,} samples.{' ' * 20}")
     return samples
 
 # ---------------------------------------------------------------------------
@@ -412,15 +421,12 @@ def generate_xpm(kit_name, selected_samples, pad_count=64):
 # Self-contained kit output
 # ---------------------------------------------------------------------------
 
-def copy_samples_to_kit(selected_samples, out_dir, progress_cb: Optional[Callable[[int, int], None]] = None):
+def copy_samples_to_kit(selected_samples, out_dir):
     """Copy selected samples into out_dir alongside the .xpm.
 
     Handles duplicate filenames by appending _2, _3, etc.
     Returns a list of destination filenames (e.g. 'kick.wav') in the same
     order as selected_samples.
-
-    When progress_cb is set, it is called as progress_cb(i, total) per file
-    instead of printing to the terminal.
     """
     dest_names = []
     used_names = {}  # stem -> count
@@ -441,138 +447,145 @@ def copy_samples_to_kit(selected_samples, out_dir, progress_cb: Optional[Callabl
         shutil.copy(src, dest)
         dest_names.append(dest_name)
 
-        if progress_cb:
-            progress_cb(i, len(selected_samples))
-        else:
-            print(f"\r  Copying samples... {i}/{len(selected_samples)}", end="", flush=True)
+        print(f"\r  Copying samples... {i}/{len(selected_samples)}", end="", flush=True)
 
-    if progress_cb is None:
-        print()  # newline after progress
+    print()  # newline after progress
     return dest_names
 
 # ---------------------------------------------------------------------------
-# XPM file writer
+# Main
 # ---------------------------------------------------------------------------
 
-def write_xpm_file(root: ET.Element, xpm_path: str) -> None:
-    """Pretty-print an XPM tree and write to disk with MPC-compatible tags."""
-    tree = ET.ElementTree(root)
-    try:
-        ET.indent(tree, space="  ")
-    except AttributeError:
-        indent_xml(root)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate a random MPC Drum Program (.xpm) from a sample directory."
+    )
+    parser.add_argument(
+        "source_dir", nargs="?", default=None,
+        help="Root directory to scan for samples (default: script's own directory)"
+    )
+    parser.add_argument("--name", default=None, help="Kit name (default: auto-generated)")
+    parser.add_argument("--count", type=int, default=64, help="Number of pads to fill (default: 64)")
+    parser.add_argument("--seed", type=int, default=None, help="Random seed for reproducibility")
+    parser.add_argument("--kits", type=int, default=None, help="Number of kits to generate (1-10)")
+    args = parser.parse_args()
 
-    buf = io.BytesIO()
-    buf.write(b'<?xml version="1.0" encoding="UTF-8"?>\n\n')
-    tree.write(buf, encoding="utf-8", xml_declaration=False)
-    xml_str = buf.getvalue().decode("utf-8")
-    xml_str = re.sub(r'<(\w+)\s*/>', r'<\1></\1>', xml_str)
+    # Ask interactively if --kits wasn't provided
+    if args.kits is None:
+        try:
+            answer = input("How many kits would you like to generate? (1-10, default 1): ").strip()
+            args.kits = int(answer) if answer else 1
+        except (ValueError, EOFError):
+            args.kits = 1
 
-    with open(xpm_path, "w", encoding="utf-8") as f:
-        f.write(xml_str)
+    # Clamp --kits to 1-10
+    args.kits = max(1, min(10, args.kits))
 
-# ---------------------------------------------------------------------------
-# Kit generation (single + orchestrator)
-# ---------------------------------------------------------------------------
-
-def generate_kit(
-    samples: List[str],
-    out_root: str,
-    kit_name: Optional[str] = None,
-    count: int = 64,
-    copy_progress_cb: Optional[Callable[[int, int], None]] = None,
-) -> str:
-    """Build one kit folder. Returns absolute path to the folder created.
-
-    `samples` is the pool to select from; `out_root` is the parent dir under
-    which the kit's folder will be created. `kit_name` of None = random.
-    """
-    count = min(count, 128, len(samples))
-    if kit_name is None:
-        kit_name = generate_fun_name()
-        ts = datetime.datetime.now().strftime("%Y%m")
-        folder_name = f"RandomKit_{kit_name}_{ts}"
+    # Default to script's own directory if no source given
+    if args.source_dir:
+        source_dir = os.path.expanduser(args.source_dir)
     else:
-        folder_name = kit_name
+        source_dir = os.path.dirname(os.path.abspath(__file__))
 
-    out_dir = os.path.join(os.path.abspath(out_root), folder_name)
-    os.makedirs(out_dir, exist_ok=True)
+    if not os.path.isdir(source_dir):
+        print(f"ERROR: '{source_dir}' is not a directory.", file=sys.stderr)
+        sys.exit(1)
 
-    selected = random.sample(samples, count)
-    dest_names = copy_samples_to_kit(selected, out_dir, progress_cb=copy_progress_cb)
+    # Set seed early so it affects both name generation and sample selection
+    if args.seed is not None:
+        random.seed(args.seed)
+        print(f"Using random seed: {args.seed}")
 
-    root = generate_xpm(kit_name, dest_names, pad_count=count)
-    write_xpm_file(root, os.path.join(out_dir, f"{kit_name}.xpm"))
-    return out_dir
+    abs_source = os.path.abspath(source_dir)
 
-
-def generate_kits(
-    source_dir: str,
-    output_dir: str,
-    num_kits: int,
-    pads_per_kit: int = 64,
-    name_override: Optional[str] = None,
-    seed: Optional[int] = None,
-    progress_cb: Optional[Callable[[float, str], None]] = None,
-    cancel_event: Optional[threading.Event] = None,
-) -> List[str]:
-    """Full pipeline: cache/scan samples, generate N kits. Returns kit paths.
-
-    `progress_cb(fraction, status_text)` is called for UI updates; `fraction`
-    is 0.0-1.0, `status_text` is a human-readable phase message. Passing
-    `cancel_event` allows cooperative cancellation between kits.
-    """
-    def report(fraction: float, status: str) -> None:
-        if progress_cb:
-            progress_cb(fraction, status)
-
-    if seed is not None:
-        random.seed(seed)
-
-    source_dir = os.path.abspath(source_dir)
-    output_dir = os.path.abspath(output_dir)
-
-    report(0.0, "Loading sample index…")
+    # Try loading from cache first; fall back to full scan
     samples = load_cache(source_dir)
-    if not samples:
+    if samples:
+        print(f"Loaded {len(samples):,} samples from cache.")
+    else:
+        # Collect existing kit output dirs to skip during scanning
         skip_dirs = []
         try:
-            for entry in os.scandir(source_dir):
+            for entry in os.scandir(abs_source):
                 if entry.is_dir() and (entry.name.startswith("random_kit_")
                                        or entry.name.startswith("RandomKit_")):
                     skip_dirs.append(os.path.abspath(entry.path))
         except PermissionError:
             pass
 
-        def scan_progress(count: int) -> None:
-            report(0.4, f"Scanning samples… {count:,} found")
-
-        samples = find_samples(source_dir, skip_dirs=skip_dirs,
-                               progress_cb=scan_progress)
+        print(f"Scanning '{source_dir}' for audio files...")
+        samples = find_samples(source_dir, skip_dirs=skip_dirs)
         if not samples:
-            raise RuntimeError(f"No .wav/.aif/.aiff files found under {source_dir}")
+            print("ERROR: No .wav/.aif/.aiff files found.", file=sys.stderr)
+            sys.exit(1)
+
         write_cache(source_dir, samples)
 
-    report(0.7, f"Found {len(samples):,} samples — generating kits…")
+    count = min(args.count, 128, len(samples))
 
-    os.makedirs(output_dir, exist_ok=True)
-    kits = []
-    for kit_num in range(1, num_kits + 1):
-        if cancel_event is not None and cancel_event.is_set():
-            break
+    # Generate one or more kits
+    for kit_num in range(1, args.kits + 1):
+        if args.kits > 1:
+            print(f"\n{'='*60}")
+            print(f"Kit {kit_num} of {args.kits}")
+            print(f"{'='*60}")
 
-        if name_override:
-            kit_name = name_override if num_kits == 1 else f"{name_override}_{kit_num}"
+        # Auto-name the kit
+        if args.name:
+            kit_name = args.name if args.kits == 1 else f"{args.name}_{kit_num}"
+            folder_name = kit_name
         else:
-            kit_name = None  # generate_kit picks a random one
+            kit_name = generate_fun_name()
+            ts = datetime.datetime.now().strftime("%Y%m")
+            folder_name = f"RandomKit_{kit_name}_{ts}"
 
-        display_name = kit_name or "(random)"
-        report(0.7 + 0.3 * (kit_num - 1) / num_kits,
-               f"Generating kit {kit_num} of {num_kits}: {display_name}")
+        out_dir = os.path.join(abs_source, folder_name)
 
-        kit_path = generate_kit(samples, output_dir, kit_name=kit_name,
-                                count=pads_per_kit)
-        kits.append(kit_path)
+        selected = random.sample(samples, count)
+        print(f"Selected {count} samples randomly.")
 
-    report(1.0, f"Done — {len(kits)} kit(s) in {output_dir}")
-    return kits
+        # Create self-contained output directory
+        os.makedirs(out_dir, exist_ok=True)
+
+        print(f"\nGenerating kit: '{kit_name}' in '{folder_name}'")
+        print(f"Output directory: {out_dir}")
+
+        # Copy samples alongside the .xpm
+        dest_names = copy_samples_to_kit(selected, out_dir)
+
+        # Generate .xpm — MPC resolves by SampleName (stem), so pass filenames
+        root = generate_xpm(kit_name, dest_names, pad_count=count)
+
+        tree = ET.ElementTree(root)
+
+        # ET.indent is Python 3.9+; fall back to our own indenter on older versions
+        try:
+            ET.indent(tree, space="  ")
+        except AttributeError:
+            indent_xml(root)
+
+        xpm_path = os.path.join(out_dir, f"{kit_name}.xpm")
+
+        # Write XML to string first, then fix self-closing tags.
+        # MPC's parser doesn't handle <Tag /> — it needs <Tag></Tag>.
+        buf = io.BytesIO()
+        buf.write(b'<?xml version="1.0" encoding="UTF-8"?>\n\n')
+        tree.write(buf, encoding="utf-8", xml_declaration=False)
+        xml_str = buf.getvalue().decode("utf-8")
+        xml_str = re.sub(r'<(\w+)\s*/>', r'<\1></\1>', xml_str)
+
+        with open(xpm_path, "w", encoding="utf-8") as f:
+            f.write(xml_str)
+
+        print(f"\nKit written to: {xpm_path}")
+        print(f"\nPad assignments:")
+        for i, (name, src) in enumerate(zip(dest_names, selected), 1):
+            print(f"  Pad {i:>3}: {name}  ({os.path.relpath(src, source_dir)})")
+
+    if args.kits > 1:
+        print(f"\n{'='*60}")
+        print(f"Done! Generated {args.kits} kits.")
+        print(f"{'='*60}")
+
+if __name__ == "__main__":
+    main()
