@@ -34,12 +34,12 @@ commit that.
 Releases are built by GitHub Actions, so nothing needs to be built locally.
 
 1. Bump the version in **both** `src/module.json` and `release.json`
-   (including the `download_url`), e.g. `0.3.0` → `0.4.0`.
+   (including the `download_url`), e.g. `1.0.0` → `1.1.0`.
 2. Add a section to `CHANGELOG.md`.
-3. Commit, then create a **tag** `v0.4.0`:
+3. Commit, then create a **tag** `v1.1.0`:
    - GitHub Desktop: **History**, right-click the commit, **Create Tag…**,
-     `v0.4.0`, then **Push origin** (Desktop pushes tags with it).
-   - CLI: `git tag v0.4.0 && git push origin v0.4.0`
+     `v1.1.0`, then **Push origin** (Desktop pushes tags with it).
+   - CLI: `git tag v1.1.0 && git push origin v1.1.0`
 4. The **Release** workflow:
    - checks that the tag matches `module.json` and `release.json`,
    - builds `flukedrums-module.tar.gz` with Zig,

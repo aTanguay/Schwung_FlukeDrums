@@ -34,7 +34,9 @@ enum {
     RR_MAX_FOLDERS = 128,
     RR_MAX_ROOTS = 4,
     RR_FOLDER_LABEL_MAX = 72,
-    RR_FOLDER_DEPTH = 3       /* list folders up to this many levels below a root */
+    /* The scan records folders down to this many levels below a root; the
+     * plugin shows those within the user's Folder Depth (2-7). */
+    RR_FOLDER_DEPTH_MAX = 7
 };
 
 /* Kit roles: what a sample is, guessed from its file (or folder) name. In Kit
@@ -59,6 +61,7 @@ typedef struct {
     char label[RR_FOLDER_LABEL_MAX];  /* "My/Drums/Kicks (412)" — unique within a list */
     char path[RR_PATH_MAX];
     int files;
+    int depth;                        /* levels below its root: 0 = the root itself */
 } rr_folder_t;
 
 /* Published by the worker as an immutable snapshot: once rr_folders() hands

@@ -76,7 +76,12 @@
         "  file inside it.",
         "Unlock All",
         "Max Len: skip files",
-        "  longer (0 = off)."
+        "  longer (0 = off).",
+        "Folder Depth (page",
+        "  after Pool): how",
+        "  deep the Folder",
+        "  list reaches,",
+        "  2-7 (default 5)."
       ]
     },
     {

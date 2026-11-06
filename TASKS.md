@@ -65,6 +65,8 @@ each section. See [PLANNING.md](PLANNING.md) for the design behind these.
 
 ## Done
 
+- [x] v1.0.0: **Folder Depth** (2–7, default 5) for the Folder list, filtered
+      at format time (no rescan)
 - [x] **Kit Mode**: pads 1-8 roll a real kit by sample name (word matching,
       folder fallback, part fallbacks), Kit Parts readout, Roll Pad keeps the part
 - [x] Undo skips pads that are locked now or changed by hand since the roll

@@ -12,7 +12,7 @@ folder so Move's own browser can use it.
 It's a happy-accident machine. You don't build a kit, you find one.
 
 
-> **Status:** v0.4.1, early. It works on a real Move, but it's new.
+> **Status:** v1.0.0. It works on a real Move, but it's new.
 > Back up anything you care about before installing, and read Schwung's
 > [important notice](https://github.com/charlesvestal/schwung#important-notice)
 > (including DFU restore), as with any Schwung module.
@@ -25,7 +25,8 @@ It's a happy-accident machine. You don't build a kit, you find one.
 - **Lock** any pad so rolls leave it alone
 - **Undo Roll**, 32 levels deep, for when you rolled away something good
 - **Folder picker** with sample counts: your Samples (`My`) or Ableton's
-  library (`Core`), up to three levels deep, with subfolders included
+  library (`Core`), up to 7 levels deep (**Folder Depth**, default 5), with
+  subfolders included
 - **Kit Mode**: the bottom two rows roll a real kit (kick, snare, clap,
   hats, cymbal, tom) found by sample names; the top two rows stay wild
 - **Max Len** filter keeps 4-minute stems out of your kick slot
@@ -96,7 +97,7 @@ Roll, Undo and Save Kit fire from a single turn of their knob (one flick = one p
 **3. Pad 2**: the pad's Sample (pick by hand), plus Rand Pan, Rand Vol, Rand Decay and Chance.
 
 **4. Pool**: Kit Mode, Subfolders, Rescan, Browse (deeper folders), Unlock All, and readouts:
-Pool Size, Kit Parts, Status (Undos and Last Kit on the page after).
+Pool Size, Kit Parts, Status. The page after it has Folder Depth, Undos and Last Kit.
 
 **5. Global**: master volume, polyphony, velocity curve, humanize.
 

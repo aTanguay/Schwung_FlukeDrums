@@ -370,6 +370,30 @@ int main() {
         CHECK(got == want, "folder list mismatch (got %d entries)", fl->count);
         if (got != want) for (auto &g : got) std::fprintf(stderr, "    got: %s\n", g.c_str());
         CHECK(fl->count > 1 && std::string(fl->e[1].path) == pool + "/kicks", "folder path: %s", fl->e[1].path);
+        CHECK(fl->count == 6 && fl->e[0].depth == 0 && fl->e[1].depth == 1 && fl->e[4].depth == 2 && fl->e[5].depth == 0,
+              "folder depths");
+    }
+
+    /* Folders are recorded down to RR_FOLDER_DEPTH_MAX (7) levels, not deeper */
+    {
+        std::string t = root + "/deeptree";
+        for (int d = 1; d <= 9; d++) t += "/d" + std::to_string(d);
+        mkdirs(t);
+        write_fake(t + "/z.wav", 10);
+        rr_ctx_t *c4 = rr_create(fake_loader, commit_root.c_str());
+        rr_add_folder_root(c4, (root + "/deeptree").c_str(), "T");
+        rr_scan_folders(c4);
+        for (int i = 0; i < 5000 && rr_busy(c4); i++) usleep(1000);
+        const rr_folder_list_t *dl = rr_folders(c4);
+        CHECK(dl && dl->count == 1 + RR_FOLDER_DEPTH_MAX, "deep tree lists %d folders, want %d", dl ? dl->count : -1,
+              1 + RR_FOLDER_DEPTH_MAX);
+        if (dl) {
+            int maxd = 0;
+            for (int i = 0; i < dl->count; i++) maxd = std::max(maxd, dl->e[i].depth);
+            CHECK(maxd == RR_FOLDER_DEPTH_MAX, "deepest listed folder is depth %d", maxd);
+            CHECK(std::string(dl->e[0].label) == "T (1)", "deep tree root counts the file 9 levels down: %s", dl->e[0].label);
+        }
+        rr_destroy(c4);
     }
 
     /* 150 folders under one root: capped at 128, shallow first, still tree-sorted */

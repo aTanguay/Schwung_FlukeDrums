@@ -21,6 +21,8 @@ static const mrdrums_param_desc_t kGlobalParams[] = {
     {"rr_max_len", "Max Len", "float", NULL, 0, 0.0f, 10.0f, 0.1f, 2.0f, NULL, NULL, NULL, NULL, NULL},
     /* FlukeDrums: pads 1-8 follow a kit (kick, snare, hats...) found by sample name. */
     {"rr_kit_mode", "Kit Mode", "enum", NULL, 0, 0.0f, 0.0f, 0.0f, 0.0f, "on", "[\"off\",\"on\"]", NULL, NULL, NULL},
+    /* FlukeDrums: how many levels below My / Core the Folder list reaches. */
+    {"rr_folder_depth", "Folder Depth", "int", NULL, 0, 2.0f, 7.0f, 1.0f, 5.0f, NULL, NULL, NULL, NULL, NULL},
 };
 
 static const mrdrums_pad_field_desc_t kPadFields[] = {

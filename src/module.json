@@ -2,7 +2,7 @@
  "id": "flukedrums",
  "name": "FlukeDrums",
  "abbrev": "FLUKE",
- "version": "0.4.1",
+ "version": "1.0.0",
  "description": "A drum machine built on lucky accidents: random kits from your sample library. Roll, lock the keepers, reroll the rest, save the kit.",
  "author": "Andy Tanguay (FlukeDrums) / handcraftedcc (MrDrums engine)",
  "license": "MIT",
@@ -21,7 +21,8 @@
   "rr_pool_dir": "/data/UserData/UserLibrary/Samples",
   "rr_recursive": "on",
   "rr_max_len": 2.0,
-  "rr_kit_mode": "on"
+  "rr_kit_mode": "on",
+  "rr_folder_depth": 5
  },
  "capabilities": {
   "audio_out": true,
@@ -114,6 +115,7 @@
       "rr_pool_count",
       "rr_kit_parts",
       "rr_status",
+      "rr_folder_depth",
       "rr_undo_depth",
       "rr_last_kit"
      ],

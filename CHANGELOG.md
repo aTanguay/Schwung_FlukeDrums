@@ -1,8 +1,16 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-11-05
+
+First release for the Schwung module catalog.
 
 ### Added
+- **Folder Depth** (the page after Pool, near the end of the menus): how many
+  levels below `My` / `Core` the Folder list reaches, from 2 to 7. Default 5
+  (it was fixed at 3). Changing it is instant: the background scan records all
+  7 levels in one pass, and the setting only filters the list. A pool deeper
+  than the list shows appears as `Custom: <folder>`. Rolls still search every
+  subfolder of the pool you pick, as before.
 - **Kit Mode** (Pool page, knob 1; on by default). The bottom two rows of pads
   now roll a real kit, found by sample names: pads 1–2 kick, 3 snare, 4 clap,
   5 closed hat, 6 open hat, 7 crash/ride, 8 tom/perc. The top two rows stay

@@ -507,6 +507,57 @@ int main() {
         settle(inst);
     }
 
+    /* 11c. Folder Depth: how deep the Folder list reaches (2-7, default 5).
+     * The scan records 7 levels; the setting only filters the list. */
+    {
+        auto has_folder = [&](const std::string &label) {
+            std::string cpd = get(inst, "chain_params");
+            size_t fo = cpd.find("\"key\":\"rr_folder\"");
+            return fo != std::string::npos && cpd.find("\"" + label + "\"", fo) != std::string::npos;
+        };
+        std::string t = pool;
+        std::string label = "My";
+        for (int d = 1; d <= 6; d++) {
+            t += "/deep" + std::to_string(d);
+            label += "/deep" + std::to_string(d);
+        }
+        mkdirs(t);
+        write_wav(t + "/z.wav", 0.1f, 700);
+        set(inst, "rr_rescan", "Scan!");
+        settle(inst);
+        const std::string d2 = "My/deep1/deep2 (1)", d3 = "My/deep1/deep2/deep3 (1)";
+        const std::string d5 = "My/deep1/deep2/deep3/deep4/deep5 (1)", d6 = label + " (1)";
+
+        CHECK(get(inst, "rr_folder_depth") == "5", "folder depth default: %s", get(inst, "rr_folder_depth").c_str());
+        CHECK(has_folder(d5) && !has_folder(d6), "depth 5 should list deep5 but not deep6");
+        set(inst, "rr_folder_depth", "7");
+        CHECK(has_folder(d6), "depth 7 should list deep6 (no rescan needed)");
+        set(inst, "rr_folder_depth", "2");
+        CHECK(has_folder(d2) && !has_folder(d3) && has_folder("My/snares/deep (14)"), "depth 2 list");
+        set(inst, "rr_folder_depth", "9");
+        CHECK(get(inst, "rr_folder_depth") == "7", "folder depth clamps to 7: %s", get(inst, "rr_folder_depth").c_str());
+        set(inst, "rr_folder_depth", "0");
+        CHECK(get(inst, "rr_folder_depth") == "2", "folder depth clamps to 2: %s", get(inst, "rr_folder_depth").c_str());
+
+        /* a pool deeper than the list shows reads as Custom; widen the list and it's named again */
+        set(inst, "rr_pool_dir", (pool + "/deep1/deep2/deep3/deep4").c_str());
+        settle(inst);
+        CHECK(get(inst, "rr_folder") == "Custom: deep4", "deep pool at depth 2: %s", get(inst, "rr_folder").c_str());
+        set(inst, "rr_folder_depth", "5");
+        CHECK(get(inst, "rr_folder") == "My/deep1/deep2/deep3/deep4 (1)", "deep pool at depth 5: %s",
+              get(inst, "rr_folder").c_str());
+        /* index picks count only the folders shown */
+        set(inst, "rr_folder_depth", "2");
+        set(inst, "rr_folder", "1");                    /* shown: My, My/deep1, ... */
+        settle(inst);
+        CHECK(get(inst, "rr_pool_dir") == pool + "/deep1", "index pick under depth 2: %s", get(inst, "rr_pool_dir").c_str());
+        CHECK(get(inst, "chain_params").find("\"rr_folder_depth\"") != std::string::npos, "chain_params missing Folder Depth");
+
+        set(inst, "rr_folder_depth", "6");              /* step 12 checks it survives a restore */
+        set(inst, "rr_pool_dir", longpool.c_str());
+        settle(inst);
+    }
+
     /* 12. State round-trip into a fresh instance */
     set(inst, "p09_lock", "on");
     set(inst, "rr_kit_mode", "off");
@@ -519,6 +570,7 @@ int main() {
     CHECK(pad_paths(inst2) == saved, "state restore lost pad paths");
     CHECK(get(inst2, "p09_lock") == "on", "state restore lost lock");
     CHECK(get(inst2, "rr_kit_mode") == "off", "state restore lost kit mode: %s", get(inst2, "rr_kit_mode").c_str());
+    CHECK(get(inst2, "rr_folder_depth") == "6", "state restore lost folder depth: %s", get(inst2, "rr_folder_depth").c_str());
     CHECK(get(inst2, "rr_pool_dir") == longpool, "state restore lost pool: %s", get(inst2, "rr_pool_dir").c_str());
     peak = 0.0f;
     for (int i = 0; i < 60; i++) peak = std::fmax(peak, render(inst2));

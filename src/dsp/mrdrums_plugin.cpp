@@ -109,6 +109,7 @@ typedef struct {
     int rr_recursive;
     float rr_max_len;
     int rr_kit_mode;
+    int rr_folder_depth;              /* Folder list shows folders this deep (2-7) */
     /* buffers swapped off a pad that a voice may still be reading */
     float *retired[REROLL_MAX_RETIRED];
     int retired_count;
@@ -1234,11 +1235,18 @@ static uint32_t rr_unlocked_mask(const mrdrums_instance_t *inst) {
 /* Folder picker: the label for the current pool folder, or "" if it isn't one
  * of the listed folders (a deep custom pick made with Browse). AUDIO-SAFE:
  * reads an immutable list. */
+/* The scan records folders to RR_FOLDER_DEPTH_MAX; Folder Depth decides how
+ * many of those the list shows. Filtering here, not in the scan, makes the
+ * setting instant and costs no rescan. */
+static int rr_folder_shown(const mrdrums_instance_t *inst, const rr_folder_t *f) {
+    return f->depth <= inst->rr_folder_depth;
+}
+
 static const rr_folder_t *rr_current_folder(const mrdrums_instance_t *inst) {
     const rr_folder_list_t *list = inst->rr ? rr_folders(inst->rr) : NULL;
     if (!list) return NULL;
     for (int i = 0; i < list->count; i++) {
-        if (strcmp(list->e[i].path, inst->rr_pool_dir) == 0) return &list->e[i];
+        if (rr_folder_shown(inst, &list->e[i]) && strcmp(list->e[i].path, inst->rr_pool_dir) == 0) return &list->e[i];
     }
     return NULL;
 }
@@ -1254,8 +1262,12 @@ static const rr_folder_t *rr_find_folder(const mrdrums_instance_t *inst, const c
     int all_digits = 1;
     for (const char *p = val; *p; p++) all_digits = all_digits && (*p >= '0' && *p <= '9');
     if (all_digits) {
+        /* an index counts the folders the list shows */
         int idx = atoi(val);
-        if (idx >= 0 && idx < list->count) return &list->e[idx];
+        for (int i = 0; i < list->count && idx >= 0; i++) {
+            if (!rr_folder_shown(inst, &list->e[i])) continue;
+            if (idx-- == 0) return &list->e[i];
+        }
     }
     return NULL;
 }
@@ -1525,6 +1537,10 @@ static int set_param_value(mrdrums_instance_t *inst, const char *key, const char
         if (inst->rr && !inst->restoring) rr_set_kit_mode(inst->rr, inst->rr_kit_mode);
         return 1;
     }
+    if (strcmp(key, "rr_folder_depth") == 0) {
+        inst->rr_folder_depth = clampi(atoi(val), 2, RR_FOLDER_DEPTH_MAX);
+        return 1;
+    }
 
     /* ---- FlukeDrums triggers (never persisted). Fire on the option name or
      * index 1; index 0 / "-" means "do nothing" so a stray write is harmless. */
@@ -1680,6 +1696,7 @@ static int get_param_value(mrdrums_instance_t *inst, const char *key, char *buf,
     if (strcmp(key, "rr_recursive") == 0) return snprintf(buf, buf_len, "%s", on_off_to_string(inst->rr_recursive));
     if (strcmp(key, "rr_max_len") == 0) return snprintf(buf, buf_len, "%.4f", inst->rr_max_len);
     if (strcmp(key, "rr_kit_mode") == 0) return snprintf(buf, buf_len, "%s", on_off_to_string(inst->rr_kit_mode));
+    if (strcmp(key, "rr_folder_depth") == 0) return snprintf(buf, buf_len, "%d", inst->rr_folder_depth);
     if (strcmp(key, "rr_kit_parts") == 0) {
         /* How many of the 8 kit slots the pool can fill by name (its own part
          * or the fallback). Formats counts the last scan stored: audio-safe. */
@@ -1887,6 +1904,7 @@ static void *v2_create_instance(const char *module_dir, const char *json_default
     inst->rr_recursive = 1;
     inst->rr_max_len = 2.0f;
     inst->rr_kit_mode = 1;
+    inst->rr_folder_depth = 5;
     set_error(inst, NULL);
 
     /* Start the worker first so every sample load below takes the async path.
@@ -2261,6 +2279,7 @@ static int build_chain_params_json(mrdrums_instance_t *inst, char *buf, int buf_
             }
         }
         for (int i = 0; list && i < list->count; i++) {
+            if (!rr_folder_shown(inst, &list->e[i])) continue;
             char esc[2 * RR_FOLDER_LABEL_MAX];
             json_escape(list->e[i].label, esc, sizeof(esc));
             if (offset >= buf_len - (int)strlen(esc) - 16) break; /* never overrun the host buffer */
@@ -2313,12 +2332,13 @@ static int build_ui_hierarchy(mrdrums_instance_t *inst, char *buf, int buf_len) 
                     "\"knobs\":[\"pad_vol\",\"pad_pan\",\"pad_tune\",\"pad_start\",\"pad_attack_ms\",\"pad_decay_ms\",\"pad_choke_group\",\"pad_mode\"]"
                 "},"
                 /* Pool: set-and-forget pool and kit settings, then readouts.
-                 * Undos and Last Kit have no knob and spill onto an extra page. */
+                 * Folder Depth, Undos and Last Kit have no knob and spill onto
+                 * an extra page after it, near the end of the menus. */
                 "\"pool\":{"
                     "\"name\":\"Pool\","
                     "\"params\":[\"rr_kit_mode\",\"rr_folder\",\"rr_pool_up\",\"rr_max_len\","
                                "\"rr_recursive\",\"rr_rescan\",\"rr_pool_dir\",\"rr_unlock_all\","
-                               "\"rr_pool_count\",\"rr_kit_parts\",\"rr_status\",\"rr_undo_depth\",\"rr_last_kit\"],"
+                               "\"rr_pool_count\",\"rr_kit_parts\",\"rr_status\",\"rr_folder_depth\",\"rr_undo_depth\",\"rr_last_kit\"],"
                     "\"knobs\":[\"rr_kit_mode\",\"rr_recursive\",\"rr_rescan\",\"rr_pool_dir\",\"rr_unlock_all\",\"rr_pool_count\",\"rr_kit_parts\",\"rr_status\"]"
                 "},"
                 "\"global\":{"

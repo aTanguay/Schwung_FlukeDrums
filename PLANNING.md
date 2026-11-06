@@ -137,8 +137,14 @@ Upstream MrDrums broke this in three places, all fixed here:
   copies each pad as `NN <basename>`, and writes `flukedrums-kit.json` with sources.
 - **Folder scan.** Walks each library root (`My` → `UserLibrary/Samples`,
   `Core` → `CoreLibrary/Samples`), counts audio per folder recursively, and
-  keeps folders with files down to depth 3. Over 128 entries (Schwung's enum
-  option limit), it keeps shallow folders first, then sorts into tree order.
+  records folders with files down to depth 7 (`RR_FOLDER_DEPTH_MAX`), each with
+  its depth. The walk goes deeper anyway to count files, so that costs no I/O.
+  Over 128 entries (Schwung's enum option limit), it keeps shallow folders
+  first, then sorts into tree order. The plugin shows only entries within the
+  user's Folder Depth (`rr_folder_depth`, 2–7) when it formats the list, so the
+  setting needs no rescan and no new list; because truncation is
+  shallow-first, the filtered list is exactly what a scan to that depth would
+  keep.
   Labels (`My/Drums/Kicks (412)`) are unique and act as the wire value.
 
 ## Parameters
@@ -151,6 +157,7 @@ Upstream MrDrums broke this in three places, all fixed here:
 | `rr_kit_mode` | enum off/on (default on) | yes |
 | `p01_lock`…`p16_lock`, alias `pad_lock` | enum off/on | yes |
 | `rr_folder` | dynamic enum, `options_as_string`; label ↔ path | via `rr_pool_dir` |
+| `rr_folder_depth` | int 2–7 (default 5); filters the `rr_folder` list | yes |
 | `rr_roll`, `rr_roll_pad`, `rr_undo`, `rr_commit`, `rr_rescan`, `rr_unlock_all`, `rr_pool_up` | trigger: `access:"write"`, options `["-","Roll!"]` | no |
 | `rr_status`, `rr_last_kit`, `rr_pool_count`, `rr_undo_depth`, `rr_kit_parts`, `rr_busy` | readout: `access:"read"` | no |
 
@@ -201,5 +208,6 @@ correct-but-slow roll look like a bug.
 | 2026-10-31 | Library roots: My + Core | Covers user samples and Ableton's library; Up One stops at the root so the pool can't swallow system folders |
 | 2026-11-02 | Undo skips locked pads and pads changed since the roll | Locking the one keeper and undoing the rest is the natural move; hand-picks aren't undo steps (browser preview would flood the stack), so undo must not clobber them either |
 | 2026-11-02 | Preset parsing as a generic worker job | Third realtime violation inherited from MrDrums; a generic `rr_job` keeps `reroll.cpp` free of MrDrums types |
+| 2026-11-05 | Folder Depth filters the list instead of rescanning | The scan already walks every level to count files; recording 7 and filtering at format time makes the knob instant and avoids publishing a new folder list per detent (lists are kept until destroy, capped at 64) |
 | 2026-11-02 | Kit Mode: roles by sample name, bottom two rows only | Ported from Andy's MPC RandoKitter idea: half the pads make a playable kit, half stay wild. Word matching (not substring) so `BD` can't match `ABDUCT`; folder fallback because packs and Ableton's library name folders, not files |
 | 2026-11-02 | Continuous soft clip | Upstream's `tanh` above 0.95 had a 0.95 → 0.74 cliff; a value- and slope-matched knee removes it |

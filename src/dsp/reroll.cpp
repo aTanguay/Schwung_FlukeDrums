@@ -531,13 +531,14 @@ static const size_t kFolderFileCap = 400000;
 static const int kMaxFolderLists = 64;
 
 /* Post-order walk: returns this dir's recursive audio count and records every
- * dir down to RR_FOLDER_DEPTH. Same skip rules as the pool scan. */
+ * dir down to RR_FOLDER_DEPTH_MAX. Same skip rules as the pool scan. The walk
+ * goes deeper anyway (to count files), so recording more levels costs no I/O. */
 static int walk_counts(rr_ctx *c, const std::string &dir, int depth, std::vector<DirInfo> &out, size_t *seen) {
     if (c->stop.load(std::memory_order_relaxed)) return 0;
     DIR *d = opendir(dir.c_str());
     if (!d) return 0;
     size_t my_index = out.size();
-    if (depth <= RR_FOLDER_DEPTH) out.push_back(DirInfo{dir, depth, 0});
+    if (depth <= RR_FOLDER_DEPTH_MAX) out.push_back(DirInfo{dir, depth, 0});
 
     int count = 0;
     std::vector<std::string> subdirs;
@@ -574,7 +575,7 @@ static int walk_counts(rr_ctx *c, const std::string &dir, int depth, std::vector
         if (*seen >= kFolderFileCap) break;
         count += walk_counts(c, sub, depth + 1, out, seen);
     }
-    if (depth <= RR_FOLDER_DEPTH) out[my_index].files = count;
+    if (depth <= RR_FOLDER_DEPTH_MAX) out[my_index].files = count;
     return count;
 }
 
@@ -614,8 +615,9 @@ static void do_scan_folders(rr_ctx *c) {
     }
 
     /* Over the 128 limit? Keep shallow folders first (every root, then depth
-     * 1, 2, 3), then restore tree order for display. Deeper folders are still
-     * reachable with Up One / Browse. */
+     * 1, 2, ...), then restore tree order for display. Deeper folders are still
+     * reachable with Up One / Browse. Shallow-first also means the plugin's
+     * Folder Depth filter shows exactly what a scan to that depth would keep. */
     std::stable_sort(picks.begin(), picks.end(), [](const Pick &a, const Pick &b) { return a.depth < b.depth; });
     if (picks.size() > (size_t)RR_MAX_FOLDERS) picks.resize(RR_MAX_FOLDERS);
     std::stable_sort(picks.begin(), picks.end(), [&](const Pick &a, const Pick &b) {
@@ -632,6 +634,7 @@ static void do_scan_folders(rr_ctx *c) {
         rr_folder_t *f = &list->e[list->count];
         snprintf(f->path, sizeof(f->path), "%s", p.path.c_str());
         f->files = p.files;
+        f->depth = p.depth;
         make_label(f, p.root_label, p.rel);
         /* labels are the wire format, so they must be unique */
         for (int k = 0; k < list->count; k++) {

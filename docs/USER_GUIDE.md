@@ -86,8 +86,13 @@ Core/Drums (900)
 Turn knob 1 to step through folders, or hold it and click for the full list.
 The pool changes as soon as you land on one.
 
-The list shows folders up to three levels deep and at most 128 of them (a
-Schwung limit). With a big library, shallower folders get priority.
+The list shows folders up to **Folder Depth** levels below `My` / `Core`
+(default 5; set it from 2 to 7 on the page after Pool), and at most 128 of
+them (a Schwung limit). With a big library, shallower folders get priority, so
+a deeper setting mostly helps smaller or deeply nested libraries (Splice-style
+`Packs/Vendor/Pack/One Shots/Kicks`). The change is instant, with no rescan.
+Rolls always search every subfolder of the pool, however deep, whatever this
+is set to.
 
 ### Up One
 
@@ -234,9 +239,9 @@ none short enough). Pick another **Folder**, check **Subfolders** is on, or set
 loads, which takes a second or two on a big library. Back out of the page and
 come back in. If it persists, hit **Rescan**.
 
-**A folder I want isn't in the list.** It's deeper than three levels, or the
-list hit 128 entries. Use **Browse** (pick any file in the folder), or pick its
-parent and keep Subfolders on.
+**A folder I want isn't in the list.** It's deeper than Folder Depth (raise it,
+up to 7), or the list hit 128 entries. Use **Browse** (pick any file in the
+folder), or pick its parent and keep Subfolders on.
 
 **Roll does nothing.** Are all pads locked? Check Status for the lock count, or
 hit **Unlock All**. Rolls also skip files longer than **Max Len**.
